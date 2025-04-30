@@ -1,0 +1,5 @@
+Flask==2.0.1
+flask-cors==3.0.10
+matplotlib==3.4.3
+networkx==2.6.3
+numpy==1.21.2

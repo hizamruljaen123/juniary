@@ -1,0 +1,164 @@
+{
+  "data": [
+    {
+      "text": "Produk ini sangat bagus, kualitas premium, recommended seller!",
+      "metrics": {
+        "likes": 120,
+        "dislikes": 5
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Kecewa dengan kualitas produk, tidak sesuai gambar dan deskripsi",
+      "metrics": {
+        "likes": 10,
+        "dislikes": 45
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Pengiriman cepat, packing aman, barang sesuai pesanan",
+      "metrics": {
+        "likes": 80,
+        "dislikes": 3
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Barang rusak saat diterima, pelayanan customer service buruk",
+      "metrics": {
+        "likes": 15,
+        "dislikes": 60
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Lumayan bagus untuk harganya, sesuai ekspektasi",
+      "metrics": {
+        "likes": 50,
+        "dislikes": 8
+      },
+      "sentiment": "neutral"
+    },
+    {
+      "text": "Produk palsu, tidak original, jangan beli disini!",
+      "metrics": {
+        "likes": 25,
+        "dislikes": 80
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Mantap! Barang berkualitas, harga bersaing, puas banget",
+      "metrics": {
+        "likes": 150,
+        "dislikes": 7
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Pengiriman lama, respon penjual lambat",
+      "metrics": {
+        "likes": 20,
+        "dislikes": 35
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Biasa saja, tidak ada yang spesial",
+      "metrics": {
+        "likes": 30,
+        "dislikes": 15
+      },
+      "sentiment": "neutral"
+    },
+    {
+      "text": "Sangat memuaskan! Akan repeat order",
+      "metrics": {
+        "likes": 90,
+        "dislikes": 4
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Harga mahal tapi kualitas standar saja",
+      "metrics": {
+        "likes": 25,
+        "dislikes": 40
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Produk bagus tapi pengiriman agak lama",
+      "metrics": {
+        "likes": 45,
+        "dislikes": 20
+      },
+      "sentiment": "neutral"
+    },
+    {
+      "text": "Recommended seller! Fast response dan ramah",
+      "metrics": {
+        "likes": 110,
+        "dislikes": 6
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Barang tidak sesuai deskripsi, mengecewakan",
+      "metrics": {
+        "likes": 8,
+        "dislikes": 55
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "OK lah, sesuai dengan harganya",
+      "metrics": {
+        "likes": 40,
+        "dislikes": 12
+      },
+      "sentiment": "neutral"
+    },
+    {
+      "text": "Top markotop! Puas banget dengan produknya",
+      "metrics": {
+        "likes": 130,
+        "dislikes": 5
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Jangan beli disini, seller tidak bertanggung jawab",
+      "metrics": {
+        "likes": 12,
+        "dislikes": 70
+      },
+      "sentiment": "negative"
+    },
+    {
+      "text": "Cukup puas dengan produknya, sesuai harga",
+      "metrics": {
+        "likes": 60,
+        "dislikes": 15
+      },
+      "sentiment": "neutral"
+    },
+    {
+      "text": "Perfect! Tidak ada komplain sama sekali",
+      "metrics": {
+        "likes": 140,
+        "dislikes": 3
+      },
+      "sentiment": "positive"
+    },
+    {
+      "text": "Kualitas jelek, harga tidak sepadan",
+      "metrics": {
+        "likes": 5,
+        "dislikes": 65
+      },
+      "sentiment": "negative"
+    }
+  ]
+}

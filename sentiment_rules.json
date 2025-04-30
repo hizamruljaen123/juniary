@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "path": [
+        [
+          "kata_positif",
+          "<=",
+          1.0
+        ]
+      ],
+      "label": "negative",
+      "node_id": 1
+    },
+    {
+      "path": [
+        [
+          "kata_positif",
+          ">",
+          1.0
+        ]
+      ],
+      "label": "positive",
+      "node_id": 2
+    }
+  ],
+  "feature_weights": {
+    "kata_positif": 1.5,
+    "kata_negatif": -1.5,
+    "jumlah_tanda_seru": 0.3,
+    "jumlah_kata": 0.1,
+    "skor_likes": 0.8,
+    "skor_dislikes": -0.8
+  }
+}
