@@ -1,244 +1,193 @@
 from flask import Flask, request, jsonify, render_template
 import json
-import math
 import re
-from collections import Counter
-from flask_cors import CORS
-import matplotlib.pyplot as plt
-import io
-import base64
-
-app = Flask(__name__)
-CORS(app)
+import pandas as pd
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from datetime import datetime
+import os
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.utils
 
 class SentimentAnalyzer:
     def __init__(self):
-        self.rules_file = 'model_rules.json'
-        self.stop_words = {
-            'yang', 'di', 'ke', 'dari', 'pada', 'dalam', 'untuk', 'dengan', 
-            'dan', 'atau', 'ini', 'itu', 'juga', 'sudah', 'saya', 'anda', 
-            'dia', 'mereka', 'kita', 'akan', 'bisa', 'ada', 'tidak', 'saat',
-            'oleh', 'setelah', 'para', 'sampai', 'ketika', 'seperti', 'bagi'
-        }
-        
-        self.kata_positif = {
-            'bagus': 1.5, 'mantap': 1.8, 'suka': 1.3, 'puas': 1.6, 
-            'recommended': 1.7, 'keren': 1.5, 'sempurna': 2.0, 'terbaik': 1.8,
-            'memuaskan': 1.4, 'perfect': 1.9, 'worth': 1.5, 'ok': 1.2
-        }
-        
-        self.kata_negatif = {
-            'buruk': -1.5, 'jelek': -1.4, 'kecewa': -1.8, 'rusak': -1.6,
-            'mahal': -1.3, 'lambat': -1.4, 'palsu': -2.0, 'jangan': -1.2,
-            'mengecewakan': -1.9, 'tidak': -1.0, 'gagal': -1.7, 'rugi': -1.5
-        }
-        
-        self.tree_rules = {'rules': [], 'feature_weights': {}}
-        self.load_rules()
-        
-    def tokenize(self, text):
-        # Case folding
-        text = text.lower()
-        # Hapus karakter khusus
-        text = re.sub(r'[^a-z0-9\s]', ' ', text)
-        # Split ke tokens
-        tokens = text.split()
-        # Hapus stop words
-        tokens = [token for token in tokens if token not in self.stop_words]
-        return tokens
+        self.tokenizer = AutoTokenizer.from_pretrained("w11wo/indonesian-roberta-base-sentiment-classifier")
+        self.model = AutoModelForSequenceClassification.from_pretrained("w11wo/indonesian-roberta-base-sentiment-classifier")
+        self.model.eval()
+        self.labeled_data_path = 'static/data/labeled_data.csv'
 
-    def extract_features(self, text, metrics):
-        tokens = self.tokenize(text)
+    def analyze_text(self, text):
+        text = self.preprocess_text(text)
         
-        # Hitung skor sentimen dari kata-kata
-        skor_positif = sum(self.kata_positif.get(word, 0) for word in tokens)
-        skor_negatif = sum(self.kata_negatif.get(word, 0) for word in tokens)
-        
-        # Hitung metrik engagement
-        likes_weight = math.log1p(metrics['likes']) if metrics['likes'] > 0 else 0
-        dislikes_weight = -math.log1p(metrics['dislikes']) if metrics['dislikes'] > 0 else 0
-        
-        features = {
-            'skor_positif': skor_positif,
-            'skor_negatif': skor_negatif,
-            'jumlah_token': len(tokens),
-            'jumlah_tanda_seru': text.count('!'),
-            'jumlah_tanda_tanya': text.count('?'),
-            'skor_likes': likes_weight,
-            'skor_dislikes': dislikes_weight,
-            'sentiment_score': skor_positif + skor_negatif + likes_weight + dislikes_weight
-        }
-        
-        return features, tokens
-
-    def train(self, training_data):
-        processed_data = []
-        for item in training_data:
-            features, tokens = self.extract_features(item['text'], item['metrics'])
-            processed_data.append({
-                'text': item['text'],
-                'tokens': tokens,
-                'features': features,
-                'sentiment': item['sentiment']
-            })
-        
-        self.generate_rules(processed_data)
-        self.save_rules()
-        return self.visualize_tree(processed_data)
-
-    def generate_rules(self, data):
-        self.tree_rules['rules'] = []
-        
-        # Generate rules based on sentiment scores
-        for item in data:
-            score = item['features']['sentiment_score']
+        inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            probabilities = torch.softmax(outputs.logits, dim=1)
+            prediction = torch.argmax(probabilities, dim=1)
+            confidence = torch.max(probabilities).item()
             
-            if score > 2:
-                sentiment = 'positive'
-            elif score < -1:
-                sentiment = 'negative'
-            else:
-                sentiment = 'neutral'
-                
-            rule = {
-                'score_range': [score-0.5, score+0.5],
-                'predicted_sentiment': sentiment,
-                'actual_sentiment': item['sentiment'],
-                'features': item['features']
-            }
-            self.tree_rules['rules'].append(rule)
-
-    def save_rules(self):
-        with open(self.rules_file, 'w') as f:
-            json.dump(self.tree_rules, f, indent=2)
-
-    def load_rules(self):
-        try:
-            with open(self.rules_file, 'r') as f:
-                self.tree_rules = json.load(f)
-                return True
-        except FileNotFoundError:
-            return False
-
-    def visualize_tree(self, data):
-        plt.figure(figsize=(15, 10))
+        sentiment_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+        sentiment = sentiment_map[prediction.item()]
         
-        # Create scatter plot of sentiment scores
-        scores = [item['features']['sentiment_score'] for item in data]
-        sentiments = [item['sentiment'] for item in data]
-        
-        # Sort data points for better visualization
-        sorted_indices = sorted(range(len(scores)), key=lambda k: scores[k])
-        scores = [scores[i] for i in sorted_indices]
-        sentiments = [sentiments[i] for i in sorted_indices]
-        
-        # Plot points with different colors based on sentiment
-        sentiment_colors = {
-            'positive': '#2ecc71',  # Green
-            'negative': '#e74c3c',  # Red
-            'neutral': '#3498db'    # Blue
-        }
-        colors = [sentiment_colors[s] for s in sentiments]
-        
-        plt.scatter(range(len(scores)), scores, c=colors, s=100)
-        
-        # Add decision boundaries
-        plt.axhline(y=2, color='g', linestyle='--', label='Positive threshold')
-        plt.axhline(y=-1, color='r', linestyle='--', label='Negative threshold')
-        
-        # Customize plot
-        plt.title('Sentiment Distribution and Decision Boundaries', fontsize=14, pad=20)
-        plt.xlabel('Sample Index', fontsize=12)
-        plt.ylabel('Sentiment Score', fontsize=12)
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.legend(fontsize=10)
-        
-        # Add sentiment zones
-        plt.fill_between(plt.xlim(), 2, plt.ylim()[1], alpha=0.1, color='g', label='Positive Zone')
-        plt.fill_between(plt.xlim(), plt.ylim()[0], -1, alpha=0.1, color='r', label='Negative Zone')
-        plt.fill_between(plt.xlim(), -1, 2, alpha=0.1, color='b', label='Neutral Zone')
-        
-        # Save plot to bytes buffer
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight', dpi=300)
-        buf.seek(0)
-        plt.close()
-        
-        return base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    def predict(self, text, metrics):
-        features, tokens = self.extract_features(text, metrics)
-        score = features['sentiment_score']
-        
-        matching_rules = []
-        for rule in self.tree_rules['rules']:
-            if rule['score_range'][0] <= score <= rule['score_range'][1]:
-                matching_rules.append(rule)
-        
-        if score > 2:
-            sentiment = 'positive'
-        elif score < -1:
-            sentiment = 'negative'
-        else:
-            sentiment = 'neutral'
-            
         return {
+            'text': text,
             'sentiment': sentiment,
-            'features': features,
-            'tokens': tokens,
-            'score': score,
-            'matching_rules': matching_rules
+            'confidence': confidence
         }
+
+    def preprocess_text(self, text):
+        text = text.lower()
+        text = re.sub(r'https?://\S+|www\.\S+', '', text)
+        text = re.sub(r'@\w+', '', text)
+        text = re.sub(r'#', '', text)
+        text = re.sub(r'[^\w\s]', ' ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    def create_labeled_dataset(self, df1, df2):
+        labeled_data = []
+        
+        for df in [df1, df2]:
+            for _, row in df.iterrows():
+                if pd.isna(row['full_text']):
+                    continue
+                
+                analysis = self.analyze_text(row['full_text'])
+                
+                entry = {
+                    'text': row['full_text'],
+                    'preprocessed_text': analysis['text'],
+                    'sentiment': analysis['sentiment'],
+                    'confidence': analysis['confidence'],
+                    'favorite_count': row['favorite_count'],
+                    'created_at': row['created_at'],
+                    'location': row['location'],
+                    'username': row['username'],
+                    'source_dataset': 'data_latih_1' if df is df1 else 'data_latih_2'
+                }
+                labeled_data.append(entry)
+        
+        df_labeled = pd.DataFrame(labeled_data)
+        df_labeled.to_csv(self.labeled_data_path, index=False)
+        
+        return df_labeled
+
+    def generate_plots(self, df):
+        # Create subplot figure
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('Distribusi Sentimen', 'Distribusi Confidence', 
+                          'Jumlah Data per Dataset', 'Aktivitas Like')
+        )
+
+        # 1. Sentiment Distribution
+        sentiment_counts = df['sentiment'].value_counts()
+        colors = {'negative': '#e74c3c', 'neutral': '#3498db', 'positive': '#2ecc71'}
+        fig.add_trace(
+            go.Bar(x=sentiment_counts.index, y=sentiment_counts.values,
+                  marker_color=[colors[sent] for sent in sentiment_counts.index],
+                  name='Sentiment'),
+            row=1, col=1
+        )
+
+        # 2. Confidence Distribution
+        fig.add_trace(
+            go.Histogram(x=df['confidence'], nbinsx=20,
+                        marker_color='#2980b9',
+                        name='Confidence'),
+            row=1, col=2
+        )
+
+        # 3. Dataset Distribution
+        dataset_counts = df['source_dataset'].value_counts()
+        fig.add_trace(
+            go.Bar(x=dataset_counts.index, y=dataset_counts.values,
+                  marker_color='#9b59b6',
+                  name='Dataset'),
+            row=2, col=1
+        )
+
+        # 4. Likes Distribution by Sentiment
+        fig.add_trace(
+            go.Box(x=df['sentiment'], y=df['favorite_count'],
+                  marker_color='#f1c40f',
+                  name='Likes'),
+            row=2, col=2
+        )
+
+        # Update layout with better formatting
+        fig.update_layout(
+            height=800,
+            showlegend=False,
+            margin=dict(l=50, r=50, t=50, b=50),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+        
+        # Convert to JSON while preserving the Plotly figure structure
+        plotly_json = json.loads(fig.to_json())
+        return json.dumps(plotly_json)
+
+app = Flask(__name__)
 
 # Initialize analyzer
 analyzer = SentimentAnalyzer()
 
 @app.route('/')
 def home():
-    return render_template('index.html')
-
-@app.route('/api/train', methods=['POST'])
-def train_model():
     try:
-        with open('training_data.json', 'r') as f:
-            training_data = json.load(f)['data']
-        
-        tree_image = analyzer.train(training_data)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Model berhasil dilatih',
-            'tree_visualization': tree_image,
-            'rules': analyzer.tree_rules
-        })
+        if os.path.exists(analyzer.labeled_data_path):
+            df = pd.read_csv(analyzer.labeled_data_path)
+            
+            # Generate plots
+            plots_json = analyzer.generate_plots(df)
+            
+            # Prepare summary statistics
+            stats = {
+                'total_entries': len(df),
+                'sentiment_counts': df['sentiment'].value_counts().to_dict(),
+                'avg_confidence': df['confidence'].mean(),
+                'avg_likes': df['favorite_count'].mean(),
+                'dataset_counts': df['source_dataset'].value_counts().to_dict()
+            }
+            
+            return render_template('index.html', 
+                                plots=plots_json,
+                                stats=stats,
+                                data=df.to_dict('records'))
+        else:
+            return render_template('index.html', 
+                                plots=None,
+                                stats=None,
+                                data=None)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return str(e), 500
 
 @app.route('/api/analyze', methods=['POST'])
-def analyze():
+def analyze_text():
     try:
         data = request.json
         text = data['comment']
-        metrics = {
-            'likes': int(data.get('likes', 0)),
-            'dislikes': int(data.get('dislikes', 0))
-        }
-        
-        result = analyzer.predict(text, metrics)
-        
-        return jsonify({
-            'tokens': result['tokens'],
-            'features': result['features'],
-            'sentiment': result['sentiment'],
-            'score': result['score'],
-            'matching_rules': result['matching_rules']
-        })
+        result = analyzer.analyze_text(text)
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
-@app.route('/api/rules', methods=['GET'])
-def get_rules():
-    return jsonify(analyzer.tree_rules)
+@app.route('/api/analyze-data', methods=['GET'])
+def analyze_data():
+    try:
+        df1 = pd.read_csv('static/data/data_latih_1.csv')
+        df2 = pd.read_csv('static/data/data_latih_2.csv')
+        df_labeled = analyzer.create_labeled_dataset(df1, df2)
+        return jsonify({
+            'success': True,
+            'message': 'Analysis complete'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
