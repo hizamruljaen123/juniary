@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analisis Sentimen Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -14,7 +15,6 @@
             background-color: #f1f5f9;
         }
 
-        /* Custom styles without @apply */
         .dashboard-card {
             background-color: white;
             border-radius: 0.75rem;
@@ -30,21 +30,8 @@
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         }
 
-        .stats-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at top right, rgba(255,255,255,0.1) 0%, transparent 60%);
-        }
-
         .sentiment-badge {
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
-            padding-top: 0.25rem;
-            padding-bottom: 0.25rem;
+            padding: 0.25rem 0.75rem;
             border-radius: 9999px;
             font-size: 0.875rem;
             font-weight: 500;
@@ -65,258 +52,397 @@
             color: #1e40af;
         }
 
-        /* Custom Table Styles */
-        .custom-table {
-            width: 100%;
+        .sidebar {
+            width: 280px;
+            background-color: white;
+            border-right: 1px solid #e5e7eb;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 50;
         }
 
+        .main-content {
+            margin-left: 280px;
+            padding: 2rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            margin: 2rem auto;
+            position: relative;
+        }
+
+        /* Custom Table Styles */
         .custom-table-container {
             overflow-x: auto;
-            overflow-y: auto;
-            max-height: 700px;
-            scrollbar-width: thin;
+            max-height: 600px;
         }
 
-        .custom-table thead {
-            background-color: #f9fafb;
-            position: sticky;
-            top: 0;
-            z-index: 10;
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
         .custom-table th {
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
-            padding-top: 0.75rem;
-            padding-bottom: 0.75rem;
+            background-color: #f9fafb;
+            padding: 0.75rem 1.5rem;
             text-align: left;
             font-size: 0.75rem;
-            font-weight: 500;
-            color: #6b7280;
+            font-weight: 600;
+            color: #4b5563;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            white-space: nowrap;
+            border-bottom: 1px solid #e5e7eb;
         }
 
         .custom-table td {
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            white-space: nowrap;
+            padding: 1rem 1.5rem;
             font-size: 0.875rem;
-            color: #111827;
-            border-bottom: 1px solid #f3f4f6;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
         }
 
-        .custom-table tbody tr:hover {
-            background-color: #f9fafb;
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
-        .text-cell {
-            max-width: 16rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .text-cell:hover {
-            white-space: normal;
-            overflow: visible;
-            z-index: 20;
-            background-color: white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-        }
-
-        /* Chart Container */
-        .chart-container {
-            background-color: white;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #f3f4f6;
-            height: 400px;
-        }
-
-        /* Custom Button */
-        .custom-button {
-            padding-left: 1rem;
-            padding-right: 1rem;
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
+        .btn-primary {
             background-color: #2563eb;
             color: white;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            transition-property: background-color;
-            transition-duration: 200ms;
         }
 
-        .custom-button:hover {
+        .btn-primary:hover {
             background-color: #1d4ed8;
         }
 
-        .custom-button:focus {
-            outline: none;
-            --tw-ring-offset-width: 2px;
-            --tw-ring-color: #3b82f6;
-            --tw-ring-offset-color: #fff;
-            box-shadow: 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color), 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+        .nav-item {
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            color: #4b5563;
+            transition: all 0.2s;
+            border-radius: 0.375rem;
+            margin: 0.25rem 0.75rem;
         }
 
-        /* Custom Form */
-        .custom-textarea {
-            display: block;
-            width: 100%;
-            border-radius: 0.5rem;
-            border: 1px solid #d1d5db;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        .nav-item:hover {
+            background-color: #f3f4f6;
+            color: #2563eb;
         }
 
-        .custom-textarea:focus {
-            border-color: #3b82f6;
-            --tw-ring-color: #3b82f6;
-            box-shadow: 0 0 0 1px var(--tw-ring-color);
-            outline: none;
+        .nav-item.active {
+            background-color: #e0e7ff;
+            color: #2563eb;
+        }
+
+        .nav-item i {
+            width: 1.5rem;
+            margin-right: 0.75rem;
         }
     </style>
-
-    {% if plots %}
-    <script id="plotly-data" type="application/json">
-        {{ plots | safe }}
-    </script>
-    {% endif %}
 </head>
-<body class="min-h-screen">
-    <div class="p-6">
-        <header class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">Dashboard Analisis Sentimen</h1>
-            <p class="text-gray-600">Analisis sentimen menggunakan RoBERTa untuk Bahasa Indonesia</p>
-        </header>
-
-        {% if stats %}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="stats-card text-white">
-                <h5 class="text-sm font-medium opacity-80">Total Data</h5>
-                <h2 class="text-3xl font-bold mt-1">{{ stats.total_entries }}</h2>
-            </div>
-            <div class="stats-card text-white">
-                <h5 class="text-sm font-medium opacity-80">Rata-rata Confidence</h5>
-                <h2 class="text-3xl font-bold mt-1">{{ "%.2f"|format(stats.avg_confidence * 100) }}%</h2>
-            </div>
-            <div class="stats-card text-white">
-                <h5 class="text-sm font-medium opacity-80">Rata-rata Likes</h5>
-                <h2 class="text-3xl font-bold mt-1">{{ "%.1f"|format(stats.avg_likes) }}</h2>
-            </div>
-            <div class="stats-card text-white">
-                <h5 class="text-sm font-medium opacity-80">Distribusi Sentimen</h5>
-                {% for sentiment, count in stats.sentiment_counts.items() %}
-                <div class="flex justify-between items-center mt-2">
-                    <span class="opacity-80">{{ sentiment }}</span>
-                    <span class="font-medium">{{ count }}</span>
-                </div>
-                {% endfor %}
-            </div>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="p-4">
+            <h1 class="text-xl font-bold text-gray-900 mb-6">Sentiment Analysis</h1>
+            <nav class="space-y-1">
+                <a href="#" class="nav-item active" onclick="showSection('dashboard')">
+                    <i class="fas fa-chart-bar"></i>
+                    Dashboard
+                </a>
+                <a href="#" class="nav-item" onclick="openModal('analyzeModal')">
+                    <i class="fas fa-search"></i>
+                    Analisis Text
+                </a>
+                <a href="#" class="nav-item" onclick="openModal('uploadModal')">
+                    <i class="fas fa-upload"></i>
+                    Upload Data
+                </a>
+                <a href="#" class="nav-item" onclick="openModal('trainingModal')">
+                    <i class="fas fa-brain"></i>
+                    Training Model
+                </a>
+                <a href="/static/data/sentiment_rules_tree.svg" class="nav-item" target="_blank">
+                    <i class="fas fa-book"></i>
+                    Visualisasi Rules
+                </a>
+                <a href="#" class="nav-item" onclick="openModal('treeModal')">
+                    <i class="fas fa-sitemap"></i>
+                    Decision Tree
+                </a>
+            </nav>
         </div>
-        {% endif %}
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Main Content -->
+    <div class="main-content">
+        <div id="dashboard-section">
+            <!-- Stats Cards -->
+            {% if stats %}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="stats-card text-white">
+                    <h5 class="text-sm font-medium opacity-80">Total Data</h5>
+                    <h2 class="text-3xl font-bold mt-1">{{ stats.total_entries }}</h2>
+                </div>
+                <div class="stats-card text-white">
+                    <h5 class="text-sm font-medium opacity-80">Rata-rata Confidence</h5>
+                    <h2 class="text-3xl font-bold mt-1">{{ "%.2f"|format(stats.avg_confidence * 100) }}%</h2>
+                </div>
+                <div class="stats-card text-white">
+                    <h5 class="text-sm font-medium opacity-80">Rata-rata Likes</h5>
+                    <h2 class="text-3xl font-bold mt-1">{{ "%.1f"|format(stats.avg_likes) }}</h2>
+                </div>
+                <div class="stats-card text-white">
+                    <h5 class="text-sm font-medium opacity-80">Distribusi Sentimen</h5>
+                    {% for sentiment, count in stats.sentiment_counts.items() %}
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="opacity-80">{{ sentiment }}</span>
+                        <span class="font-medium">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Charts -->
+            {% if plots %}
+            <div class="dashboard-card mb-8">
+                <div class="p-6">
+                    <h5 class="text-lg font-medium text-gray-900 mb-4">Visualisasi Data</h5>
+                    <div id="plotlyCharts" style="width:100%; height:800px;"></div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const plotsData = JSON.parse('{{ plots|tojson|safe }}');
+                            // Show sentiment bar chart if available, else fallback to main plot
+                            if (plotsData.sentiment_bar_chart) {
+                                Plotly.newPlot('plotlyCharts', plotsData.sentiment_bar_chart.data, plotsData.sentiment_bar_chart.layout);
+                            } else if (plotsData.data && plotsData.layout) {
+                                Plotly.newPlot('plotlyCharts', plotsData.data, plotsData.layout);
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Confusion Matrix Heatmap -->
+            {% if eval_result %}
+            <div class="dashboard-card mb-8">
+                <div class="p-6">
+                    <h5 class="text-lg font-medium text-gray-900 mb-4">Heatmap Confusion Matrix (Evaluasi Data Uji)</h5>
+                    <div id="confusionMatrixHeatmap" style="width:100%; height:400px;"></div>
+                    <script type="application/json" id="eval-result-data">{{ eval_result|tojson|safe }}</script>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const evalResultScript = document.getElementById('eval-result-data');
+                            if (evalResultScript) {
+                                try {
+                                    const evalResult = JSON.parse(evalResultScript.textContent);
+                                    if (evalResult && evalResult.confusion_matrix && evalResult.labels) {
+                                        const z = evalResult.confusion_matrix;
+                                        const x = evalResult.labels;
+                                        const y = evalResult.labels;
+                                        // Convert z to string for annotation
+                                        const text = z.map(row => row.map(val => val.toString()));
+                                        const data = [{
+                                            z: z,
+                                            x: x,
+                                            y: y,
+                                            type: 'heatmap',
+                                            colorscale: 'Blues',
+                                            showscale: true,
+                                            text: text,
+                                            texttemplate: "%{text}",
+                                            textfont: { color: "black", size: 16 }
+                                        }];
+                                        const layout = {
+                                            title: 'Confusion Matrix',
+                                            xaxis: { title: 'Predicted Label' },
+                                            yaxis: { title: 'True Label' }
+                                        };
+                                        Plotly.newPlot('confusionMatrixHeatmap', data, layout);
+                                    }
+                                } catch (e) {
+                                    // ignore
+                                }
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Data Table -->
+            {% if data %}
             <div class="dashboard-card">
                 <div class="p-6">
-                    <h5 class="text-lg font-medium text-gray-900 mb-4">Analisis Sentimen Text</h5>
-                    <form id="analysisForm">
-                        <textarea 
-                            class="custom-textarea mb-4" 
-                            name="comment" 
-                            rows="3" 
-                            placeholder="Masukkan text untuk dianalisis..."
-                        ></textarea>
-                        <button type="submit" class="custom-button">Analisis</button>
-                    </form>
-                    <div id="analysisResult" class="hidden mt-4">
-                        <h6 class="text-sm font-medium text-gray-700 mb-2">Hasil:</h6>
-                        <div id="sentimentResult"></div>
+                    <h5 class="text-lg font-medium text-gray-900 mb-4">Dataset Berlabel</h5>
+                    <div class="custom-table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Text</th>
+                                    <th>Sentiment</th>
+                                    <th>Confidence</th>
+                                    <th>Likes</th>
+                                    <th>Created At</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in data %}
+                                <tr>
+                                    <td class="max-w-md truncate">{{ row.text }}</td>
+                                    <td><span class="sentiment-badge {{ row.sentiment }}">{{ row.sentiment }}</span></td>
+                                    <td>{{ "%.1f"|format(row.confidence * 100) }}%</td>
+                                    <td>{{ row.favorite_count }}</td>
+                                    <td>{{ row.created_at }}</td>
+                                    <td>{{ row.source_dataset }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-            <div class="dashboard-card">
-                <div class="p-6">
-                    <h5 class="text-lg font-medium text-gray-900 mb-4">Model Training</h5>
-                    <button id="trainButton" class="custom-button">Latih Model dengan Dataset</button>
-                    <div id="trainResult" class="hidden mt-4">
-                        <div class="bg-green-50 text-green-800 rounded-lg p-4">
-                            Model berhasil dilatih!
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {% endif %}
+            {% endif %}
         </div>
+    </div>
 
-        {% if plots %}
-        <div class="dashboard-card mb-8">
-            <div class="p-6">
-                <h5 class="text-lg font-medium text-gray-900 mb-4">Visualisasi Data</h5>
-                <div id="plotlyCharts" style="width:100%; height:800px;"></div>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if data %}
-        <div class="dashboard-card">
-            <div class="p-6">
-                <h5 class="text-lg font-medium text-gray-900 mb-4">Dataset Berlabel</h5>
-                <div class="custom-table-container">
-                    <table class="custom-table">
-                        <thead>
-                            <tr>
-                                <th>Text</th>
-                                <th>Preprocessed</th>
-                                <th>Sentiment</th>
-                                <th>Confidence</th>
-                                <th>Likes</th>
-                                <th>Created At</th>
-                                <th>Username</th>
-                                <th>Source</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for row in data %}
-                            <tr>
-                                <td><div class="text-cell">{{ row.text }}</div></td>
-                                <td><div class="text-cell">{{ row.preprocessed_text }}</div></td>
-                                <td><span class="sentiment-badge {{ row.sentiment }}">{{ row.sentiment }}</span></td>
-                                <td>{{ "%.1f"|format(row.confidence * 100) }}%</td>
-                                <td>{{ row.favorite_count }}</td>
-                                <td>{{ row.created_at }}</td>
-                                <td>{{ row.username }}</td>
-                                <td>{{ row.source_dataset }}</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+    <!-- Modals -->
+    <!-- Analyze Modal -->
+    <div id="analyzeModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Analisis Sentimen Text</h2>
+            <form id="analysisForm">
+                <textarea 
+                    class="w-full p-2 border rounded-lg mb-4" 
+                    name="comment" 
+                    rows="4" 
+                    placeholder="Masukkan text untuk dianalisis..."
+                ></textarea>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn bg-gray-200" onclick="closeModal('analyzeModal')">Tutup</button>
+                    <button type="submit" class="btn btn-primary">Analisis</button>
                 </div>
+            </form>
+            <div id="analysisResult" class="hidden mt-4 p-4 bg-gray-50 rounded-lg"></div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Upload Dataset</h2>
+            <form id="uploadForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Pilih File CSV</label>
+                    <input type="file" accept=".csv" class="mt-1 block w-full" />
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn bg-gray-200" onclick="closeModal('uploadModal')">Tutup</button>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Training Modal -->
+    <div id="trainingModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Training Model</h2>
+            <div class="mb-4">
+                <p class="text-gray-600">Mulai pelatihan model dengan dataset yang tersedia</p>
+            </div>
+            <div class="mb-4">
+                <label for="splitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih</label>
+                <div class="flex items-center gap-4">
+                    <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'">
+                    <span id="splitValueLabel" class="font-semibold text-blue-700">80%</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Pilih persentase data latih (sisanya untuk data uji)</p>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn bg-gray-200" onclick="closeModal('trainingModal')">Tutup</button>
+                <button id="trainButton" class="btn btn-primary">Mulai Training</button>
+            </div>
+            <div id="trainResult" class="hidden mt-4 p-4 bg-green-50 text-green-700 rounded-lg"></div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Visualisasi Rules</h2>
+            <div id="rulesVisualization" class="mt-4"></div>
+            <div class="flex justify-end mt-4">
+                <button type="button" class="btn bg-gray-200" onclick="closeModal('rulesModal')">Tutup</button>
             </div>
         </div>
-        {% endif %}
+    </div>
+
+    <!-- Tree Modal -->
+    <div id="treeModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Decision Tree Visualization</h2>
+            <div id="treeVisualization" class="mt-4"></div>
+            <div class="flex justify-end mt-4">
+                <button type="button" class="btn bg-gray-200" onclick="closeModal('treeModal')">Tutup</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        // Initialize Plotly charts
         document.addEventListener('DOMContentLoaded', function() {
             const plotlyDataElement = document.getElementById('plotly-data');
             if (plotlyDataElement) {
                 try {
                     const plotsData = JSON.parse(plotlyDataElement.textContent);
-                    Plotly.newPlot('plotlyCharts', plotsData.data, plotsData.layout)
-                        .catch(error => console.error('Error plotting:', error));
+                    Plotly.newPlot('plotlyCharts', plotsData.data, plotsData.layout);
                 } catch (error) {
                     console.error('Error parsing plot data:', error);
                 }
             }
         });
 
+        // Modal functions
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Navigation
+        function showSection(section) {
+            // Implement section switching logic
+        }
+
+        // Analysis form submission
         $('#analysisForm').on('submit', function(e) {
             e.preventDefault();
             const text = $('textarea[name="comment"]').val();
@@ -328,16 +454,14 @@
                 data: JSON.stringify({ comment: text }),
                 success: function(response) {
                     $('#analysisResult').removeClass('hidden').addClass('block');
-                    $('#sentimentResult').html(`
+                    $('#analysisResult').html(`
                         <div class="space-y-2">
                             <span class="sentiment-badge ${response.sentiment}">
                                 ${response.sentiment.toUpperCase()}
                             </span>
-                            <div class="text-sm text-gray-600">
-                                Confidence: ${Math.round(response.confidence * 100)}%
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                Preprocessed: ${response.text}
+                            <div class="text-sm text-gray-600 space-y-2">
+                                <div>Confidence: ${Math.round(response.confidence * 100)}%</div>
+                                <div>Preprocessed: ${response.text}</div>
                             </div>
                         </div>
                     `);
@@ -345,22 +469,36 @@
             });
         });
 
+        // Training button click
         $('#trainButton').click(function() {
             $(this).prop('disabled', true).text('Melatih...');
-            
-            $.get('/api/analyze-data', function(response) {
-                if (response.success) {
+            const splitPercent = $('#splitSlider').val();
+
+            $.ajax({
+                url: '/api/train-model',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ split_percent: splitPercent }),
+                success: function(response) {
                     $('#trainResult').removeClass('hidden').addClass('block');
+                    $('#trainResult').text('Model berhasil dilatih!');
                     setTimeout(() => location.reload(), 1000);
+                },
+                error: function(xhr) {
+                    alert('Terjadi kesalahan saat melatih model: ' + (xhr.responseJSON?.error || 'Unknown error'));
+                },
+                complete: function() {
+                    $('#trainButton').prop('disabled', false).text('Mulai Training');
                 }
-            })
-            .fail(function() {
-                alert('Terjadi kesalahan saat melatih model');
-            })
-            .always(function() {
-                $('#trainButton').prop('disabled', false).text('Latih Model dengan Dataset');
             });
         });
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>

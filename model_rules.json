@@ -1,372 +1,78 @@
 {
-  "rules": [
-    {
-      "score_range": [
-        5.704031076368686,
-        6.704031076368686
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 3.2,
-        "skor_negatif": 0,
-        "jumlah_token": 7,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.795790545596741,
-        "skor_dislikes": -1.791759469228055,
-        "sentiment_score": 6.204031076368686
-      }
+    "confidence_rules": {
+        "very_high": {"threshold": 0.9, "label": "Sangat Tinggi"},
+        "high": {"threshold": 0.7, "label": "Tinggi"},
+        "medium": {"threshold": 0.5, "label": "Sedang"},
+        "low": {"threshold": 0.0, "label": "Rendah"}
     },
-    {
-      "score_range": [
-        -3.7307461236907242,
-        -2.7307461236907242
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.8,
-        "jumlah_token": 6,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 2.3978952727983707,
-        "skor_dislikes": -3.828641396489095,
-        "sentiment_score": -3.2307461236907242
-      }
+    "sentiment_classification": {
+        "positive": {
+            "very_positive": {"confidence_threshold": 0.8, "label": "Sangat Positif"},
+            "moderate_positive": {"confidence_threshold": 0.5, "label": "Cukup Positif"}
+        },
+        "neutral": {
+            "strong_neutral": {"confidence_threshold": 0.7, "label": "Netral Kuat"},
+            "weak_neutral": {"confidence_threshold": 0.0, "label": "Netral Lemah"}
+        },
+        "negative": {
+            "very_negative": {"confidence_threshold": 0.8, "label": "Sangat Negatif"},
+            "moderate_negative": {"confidence_threshold": 0.5, "label": "Cukup Negatif"}
+        }
     },
-    {
-      "score_range": [
-        2.5081547935525483,
-        3.5081547935525483
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": 0,
-        "jumlah_token": 7,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.394449154672439,
-        "skor_dislikes": -1.3862943611198906,
-        "sentiment_score": 3.0081547935525483
-      }
+    "popularity_rules": {
+        "viral": {
+            "threshold": 1000,
+            "categories": {
+                "positive": "Viral Positif",
+                "negative": "Viral Negatif"
+            }
+        },
+        "popular": {
+            "min_threshold": 100,
+            "max_threshold": 999,
+            "label": "Populer"
+        },
+        "normal": {
+            "threshold": 99,
+            "label": "Normal"
+        }
     },
-    {
-      "score_range": [
-        -4.93828514193353,
-        -3.9382851419335303
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -3.1,
-        "jumlah_token": 7,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 2.772588722239781,
-        "skor_dislikes": -4.110873864173311,
-        "sentiment_score": -4.43828514193353
-      }
+    "impact_rules": {
+        "high_positive": {
+            "conditions": {
+                "category": "Sangat Positif",
+                "popularity": "Viral Positif"
+            },
+            "label": "Dampak Positif Tinggi"
+        },
+        "high_negative": {
+            "conditions": {
+                "category": "Sangat Negatif",
+                "popularity": "Viral Negatif"
+            },
+            "label": "Dampak Negatif Tinggi"
+        },
+        "moderate": {
+            "conditions": {
+                "categories": ["Cukup Positif", "Netral Kuat"],
+                "popularity": "Populer"
+            },
+            "label": "Dampak Moderat"
+        },
+        "limited": {
+            "conditions": {
+                "popularity": "Normal"
+            },
+            "label": "Dampak Terbatas"
+        }
     },
-    {
-      "score_range": [
-        2.7346010553881066,
-        3.7346010553881066
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "neutral",
-      "features": {
-        "skor_positif": 1.5,
-        "skor_negatif": 0,
-        "jumlah_token": 5,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.9318256327243257,
-        "skor_dislikes": -2.1972245773362196,
-        "sentiment_score": 3.2346010553881066
-      }
-    },
-    {
-      "score_range": [
-        -4.836352616650958,
-        -3.8363526166509576
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -3.2,
-        "jumlah_token": 6,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.258096538021482,
-        "skor_dislikes": -4.394449154672439,
-        "sentiment_score": -4.336352616650958
-      }
-    },
-    {
-      "score_range": [
-        5.837838295135088,
-        6.837838295135088
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 3.4000000000000004,
-        "skor_negatif": 0,
-        "jumlah_token": 7,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 5.017279836814924,
-        "skor_dislikes": -2.0794415416798357,
-        "sentiment_score": 6.337838295135088
-      }
-    },
-    {
-      "score_range": [
-        -2.438996500732687,
-        -1.4389965007326868
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.4,
-        "jumlah_token": 5,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.044522437723423,
-        "skor_dislikes": -3.58351893845611,
-        "sentiment_score": -1.9389965007326868
-      }
-    },
-    {
-      "score_range": [
-        0.16139848224536513,
-        1.1613984822453651
-      ],
-      "predicted_sentiment": "neutral",
-      "actual_sentiment": "neutral",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": 0,
-        "jumlah_token": 3,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.4339872044851463,
-        "skor_dislikes": -2.772588722239781,
-        "sentiment_score": 0.6613984822453651
-      }
-    },
-    {
-      "score_range": [
-        3.8014215940827496,
-        4.80142159408275
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 1.4,
-        "skor_negatif": 0,
-        "jumlah_token": 4,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.51085950651685,
-        "skor_dislikes": -1.6094379124341003,
-        "sentiment_score": 4.30142159408275
-      }
-    },
-    {
-      "score_range": [
-        -2.255475528682826,
-        -1.2554755286828259
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.3,
-        "jumlah_token": 6,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.258096538021482,
-        "skor_dislikes": -3.713572066704308,
-        "sentiment_score": -1.7554755286828259
-      }
-    },
-    {
-      "score_range": [
-        1.784118958765672,
-        2.784118958765672
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "neutral",
-      "features": {
-        "skor_positif": 1.5,
-        "skor_negatif": 0,
-        "jumlah_token": 6,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.828641396489095,
-        "skor_dislikes": -3.044522437723423,
-        "sentiment_score": 2.284118958765672
-      }
-    },
-    {
-      "score_range": [
-        3.9636200522570206,
-        4.963620052257021
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 1.7,
-        "skor_negatif": 0,
-        "jumlah_token": 5,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.709530201312334,
-        "skor_dislikes": -1.9459101490553132,
-        "sentiment_score": 4.463620052257021
-      }
-    },
-    {
-      "score_range": [
-        -4.22812711339893,
-        -3.22812711339893
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.9,
-        "jumlah_token": 4,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 2.1972245773362196,
-        "skor_dislikes": -4.02535169073515,
-        "sentiment_score": -3.72812711339893
-      }
-    },
-    {
-      "score_range": [
-        1.8486227092427714,
-        2.8486227092427714
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "neutral",
-      "features": {
-        "skor_positif": 1.2,
-        "skor_negatif": 0,
-        "jumlah_token": 4,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 3.713572066704308,
-        "skor_dislikes": -2.5649493574615367,
-        "sentiment_score": 2.3486227092427714
-      }
-    },
-    {
-      "score_range": [
-        4.183437853973096,
-        5.183437853973096
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 1.6,
-        "skor_negatif": 0,
-        "jumlah_token": 5,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.875197323201151,
-        "skor_dislikes": -1.791759469228055,
-        "sentiment_score": 4.683437853973096
-      }
-    },
-    {
-      "score_range": [
-        -3.3977305195797785,
-        -2.3977305195797785
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.2,
-        "jumlah_token": 6,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 2.5649493574615367,
-        "skor_dislikes": -4.2626798770413155,
-        "sentiment_score": -2.8977305195797785
-      }
-    },
-    {
-      "score_range": [
-        2.4382851419335307,
-        3.4382851419335307
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "neutral",
-      "features": {
-        "skor_positif": 1.6,
-        "skor_negatif": 0,
-        "jumlah_token": 5,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.110873864173311,
-        "skor_dislikes": -2.772588722239781,
-        "sentiment_score": 2.9382851419335307
-      }
-    },
-    {
-      "score_range": [
-        4.962465529258278,
-        5.962465529258278
-      ],
-      "predicted_sentiment": "positive",
-      "actual_sentiment": "positive",
-      "features": {
-        "skor_positif": 1.9,
-        "skor_negatif": 0,
-        "jumlah_token": 4,
-        "jumlah_tanda_seru": 1,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 4.948759890378168,
-        "skor_dislikes": -1.3862943611198906,
-        "sentiment_score": 5.462465529258278
-      }
-    },
-    {
-      "score_range": [
-        -4.29789527279837,
-        -3.29789527279837
-      ],
-      "predicted_sentiment": "negative",
-      "actual_sentiment": "negative",
-      "features": {
-        "skor_positif": 0,
-        "skor_negatif": -1.4,
-        "jumlah_token": 4,
-        "jumlah_tanda_seru": 0,
-        "jumlah_tanda_tanya": 0,
-        "skor_likes": 1.791759469228055,
-        "skor_dislikes": -4.189654742026425,
-        "sentiment_score": -3.79789527279837
-      }
+    "preprocessing_rules": {
+        "url": {"pattern": "https?://\\S+|www\\.\\S+", "action": "remove"},
+        "mention": {"pattern": "@\\w+", "action": "remove"},
+        "hashtag": {"pattern": "#", "action": "remove"},
+        "punctuation": {"pattern": "[^\\w\\s]", "action": "replace", "replacement": " "},
+        "whitespace": {"pattern": "\\s+", "action": "replace", "replacement": " "},
+        "case": {"action": "lowercase"},
+        "emoji": {"action": "remove"}
     }
-  ],
-  "feature_weights": {
-    "kata_positif": 1.5,
-    "kata_negatif": -1.5,
-    "jumlah_tanda_seru": 0.3,
-    "jumlah_kata": 0.1,
-    "skor_likes": 0.8,
-    "skor_dislikes": -0.8
-  }
 }
