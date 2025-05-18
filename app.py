@@ -15,6 +15,13 @@ from collections import defaultdict
 import io
 import graphviz
 import shutil
+import matplotlib.pyplot as plt
+from sklearn import tree as sktree
+from collections import Counter
+import pickle
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, ENGLISH_STOP_WORDS
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 
 class SentimentAnalyzer:
     def __init__(self):
@@ -437,8 +444,7 @@ def upload_dataset():
 
 def build_c50_tree(X, y, feature_names, depth=0, max_depth=None):
     # X: numpy array (samples x features), y: labels, feature_names: list of str
-    import numpy as np
-    from collections import Counter
+    
 
     def entropy(labels):
         counts = np.bincount(labels)
@@ -500,47 +506,129 @@ def get_rules_visualization():
 @app.route('/api/train-model', methods=['POST'])
 def train_model():
     try:
+        # Inisialisasi log tahapan proses pelatihan
+        training_logs = []
+        
+        training_logs.append("Memulai proses pelatihan model...")
+        
         data = request.get_json()
         split_percent = int(data.get('split_percent', 80))
+        
+        # Get advanced parameters from request
+        tokenization_params = data.get('tokenization', {})
+        vectorization_params = data.get('vectorization', {})
+        decision_tree_params = data.get('decision_tree', {})
+        
+        training_logs.append(f"Parameter diterima: split data {split_percent}% latih, {100-split_percent}% uji")
+        
+        # Load and shuffle the data
+        training_logs.append("Memuat dataset...")
         df = pd.read_csv('static/data/labeled_data.csv')
+        training_logs.append(f"Dataset dimuat: {len(df)} data")
+        
+        training_logs.append("Mengacak dataset untuk memastikan distribusi yang merata...")
         df = df.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle
 
         train_size = int(len(df) * split_percent / 100)
         df_train = df.iloc[:train_size]
         df_test = df.iloc[train_size:]
 
+        training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
+
         # Save test set
         df_test.to_csv('static/data/test_data.csv', index=False)
+        training_logs.append("Menyimpan data uji ke file")
 
-        # DecisionTreeClassifier on preprocessed_text (vectorized, stopword removal, max depth unlimited)
-        from sklearn.feature_extraction.text import CountVectorizer, ENGLISH_STOP_WORDS
-        from sklearn.tree import DecisionTreeClassifier
-        from sklearn.metrics import confusion_matrix, classification_report
-        import json
+        # Text preprocessing based on parameters
+        training_logs.append("Mulai tahap pra-pemrosesan teks...")
+        
+        # 1. Stopwords removal
+        remove_stopwords_flag = tokenization_params.get('remove_stopwords', True)
+        if remove_stopwords_flag:
+            training_logs.append("Menghapus stopwords dari teks...")
+            stopwords = set(ENGLISH_STOP_WORDS)
+            def remove_stopwords(text):
+                return " ".join([w for w in text.split() if w not in stopwords])
+            df_train['preprocessed_text'] = df_train['preprocessed_text'].apply(remove_stopwords)
+            df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(remove_stopwords)
+          # 2. Stemming (if enabled)
+        use_stemming = tokenization_params.get('use_stemming', False)
+        if use_stemming:
+            training_logs.append("Menerapkan stemming pada kata...")
+            from nltk.stem.porter import PorterStemmer
+            stemmer = PorterStemmer()
+            
+            def stem_text(text):
+                return " ".join([stemmer.stem(word) for word in text.split()])
+            
+            df_train['preprocessed_text'] = df_train['preprocessed_text'].apply(stem_text)
+            df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(stem_text)
+        
+        # 3. Lemmatization (if enabled)
+        use_lemmatization = tokenization_params.get('use_lemmatization', False)
+        if use_lemmatization:
+            training_logs.append("Menerapkan lemmatization pada kata...")
+            from nltk.stem import WordNetLemmatizer
+            lemmatizer = WordNetLemmatizer()
+            
+            def lemmatize_text(text):
+                return " ".join([lemmatizer.lemmatize(word) for word in text.split()])
+            
+            df_train['preprocessed_text'] = df_train['preprocessed_text'].apply(lemmatize_text)
+            df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(lemmatize_text)
 
-        # Remove stopwords from preprocessed_text
-        stopwords = set(ENGLISH_STOP_WORDS)
-        def remove_stopwords(text):
-            return " ".join([w for w in text.split() if w not in stopwords])
-        df_train['preprocessed_text'] = df_train['preprocessed_text'].apply(remove_stopwords)
-        df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(remove_stopwords)
-
-        vectorizer = CountVectorizer()
+        # Vectorization based on parameters
+        vectorization_method = vectorization_params.get('method', 'count')
+        max_features = int(vectorization_params.get('max_features', 5000))
+        
+        training_logs.append(f"Melakukan vektorisasi dengan metode {vectorization_method}, max features: {max_features}...")
+        if vectorization_method == 'tfidf':
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            vectorizer = TfidfVectorizer(max_features=max_features)
+        else:  # default to CountVectorizer
+            vectorizer = CountVectorizer(max_features=max_features)
+            
         X_train = vectorizer.fit_transform(df_train['preprocessed_text'])
         y_train = df_train['sentiment']
 
         X_test = vectorizer.transform(df_test['preprocessed_text'])
         y_test = df_test['sentiment']
 
-        clf = DecisionTreeClassifier(random_state=42, max_depth=None)
+        training_logs.append(f"Jumlah fitur setelah vektorisasi: {len(vectorizer.get_feature_names_out())}")
+
+        # Decision Tree parameters
+        max_depth_str = decision_tree_params.get('max_depth', 'none')
+        max_depth = None if max_depth_str == 'none' else int(max_depth_str)
+        
+        min_samples_split = int(decision_tree_params.get('min_samples_split', 2))
+        min_samples_leaf = int(decision_tree_params.get('min_samples_leaf', 1))
+        criterion = decision_tree_params.get('criterion', 'gini')
+        
+        training_logs.append(f"Parameter Decision Tree: max_depth={max_depth_str}, criterion={criterion}, min_samples_split={min_samples_split}, min_samples_leaf={min_samples_leaf}")
+        
+        # Create and train the model
+        training_logs.append("Mulai pelatihan model decision tree...")
+        clf = DecisionTreeClassifier(
+            random_state=42, 
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            criterion=criterion
+        )
         clf.fit(X_train, y_train)
+        training_logs.append("Pelatihan model selesai")
+          # Evaluate the model
+        y_pred = clf.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        training_logs.append(f"Evaluasi model pada data uji: akurasi = {accuracy:.4f} ({accuracy*100:.2f}%)")
 
         # Save model (pickle)
-        import pickle
+        training_logs.append("Menyimpan model ke disk...")
         with open('static/data/sentiment_model.pkl', 'wb') as f:
             pickle.dump({'model': clf, 'vectorizer': vectorizer}, f)
 
         # Save rules as JSON using manual C5.0-like function
+        training_logs.append("Membuat struktur pohon keputusan C5.0...")
         sentiment_labels = sorted(y_train.unique())
         label_to_int = {label: i for i, label in enumerate(sentiment_labels)}
         int_to_label = {i: label for label, i in label_to_int.items()}
@@ -550,6 +638,7 @@ def train_model():
         feature_names = vectorizer.get_feature_names_out().tolist()
 
         c50_tree = build_c50_tree(X_train_arr, y_train_int, feature_names)
+        training_logs.append("Struktur pohon keputusan berhasil dibuat")
 
         # Recursively convert integer classes to sentiment labels in the tree
         def convert_classes(tree):
@@ -562,9 +651,7 @@ def train_model():
 
         c50_tree = convert_classes(c50_tree)
         with open('static/data/rules.json', 'w') as f:
-            json.dump(c50_tree, f, indent=2)
-
-        # Save human-readable rules as TXT
+            json.dump(c50_tree, f, indent=2)        # Save human-readable rules as TXT
         def rules_to_text(tree, indent=0):
             pad = "    " * indent
             if "class" in tree:
@@ -580,15 +667,15 @@ def train_model():
                     lines.append(rules_to_text(subtree, indent + 1))
                 return "\n".join(lines)
             return ""
-
         rules_txt = rules_to_text(c50_tree)
         with open('sentiment_rules.txt', 'w', encoding='utf-8') as f:
             f.write(rules_txt)
+        training_logs.append("Aturan keputusan disimpan dalam format teks")
 
-        # Generate and save visualization as image (PNG) using matplotlib
-        import matplotlib.pyplot as plt
-        from sklearn import tree as sktree
+        # Generate and save visualization as image (SVG) using matplotlib
+        training_logs.append("Membuat visualisasi pohon keputusan...")
 
+        # Create the decision tree visualization
         plt.figure(figsize=(40, 20))
         sktree.plot_tree(
             clf,
@@ -601,6 +688,7 @@ def train_model():
             precision=2
         )
         plt.tight_layout()
+        
         # Dynamically set SVG size based on tree size
         depth = clf.get_depth()
         leaves = clf.get_n_leaves()
@@ -608,15 +696,30 @@ def train_model():
         height = max(10, depth * 3)
         fig = plt.gcf()
         fig.set_size_inches(width, height)
+        
+        # Save to root directory for direct access via URL
+        plt.savefig("sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
+        plt.close()
+
+        # Save a copy to static folder for compatibility
+        plt.figure(figsize=(40, 20))
+        sktree.plot_tree(
+            clf,
+            feature_names=vectorizer.get_feature_names_out().tolist(),
+            class_names=[str(c) for c in clf.classes_],
+            filled=True,
+            rounded=True,
+            fontsize=14,
+            proportion=False,
+            precision=2
+        )
         plt.savefig("static/data/sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
         plt.close()
 
         # Evaluate on test set
         y_pred = clf.predict(X_test)
         cm = confusion_matrix(y_test, y_pred, labels=clf.classes_)
-        report = classification_report(y_test, y_pred, output_dict=True, labels=clf.classes_)
-
-        # Save confusion matrix and metrics
+        report = classification_report(y_test, y_pred, output_dict=True, labels=clf.classes_)        # Save confusion matrix and metrics
         eval_result = {
             'confusion_matrix': cm.tolist(),
             'labels': list(clf.classes_),
@@ -625,8 +728,107 @@ def train_model():
         with open('static/data/eval_result.json', 'w') as f:
             json.dump(eval_result, f, indent=2)
 
-        return jsonify({'success': True, 'eval_result': eval_result})
+        training_logs.append("Proses pelatihan selesai!")
+        training_logs.append(f"Akurasi model: {accuracy*100:.2f}%")
+
+        return jsonify({
+            'success': True, 
+            'eval_result': eval_result,
+            'accuracy': float(accuracy),
+            'training_logs': training_logs
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@app.route('/api/data-distribution', methods=['GET'])
+def get_data_distribution():
+    try:
+        total_data = 0
+        train_size = 0
+        test_size = 0
+        
+        # Check if labeled data exists
+        if os.path.exists('static/data/labeled_data.csv'):
+            df_all = pd.read_csv('static/data/labeled_data.csv')
+            total_data = len(df_all)
+            
+            # Check if test data exists
+            if os.path.exists('static/data/test_data.csv'):
+                df_test = pd.read_csv('static/data/test_data.csv')
+                test_size = len(df_test)
+                train_size = total_data - test_size
+            else:
+                # If no explicit test data, use 80/20 split for visualization
+                train_size = int(total_data * 0.8)
+                test_size = total_data - train_size
+        
+        return jsonify({
+            'total_data': total_data,
+            'train_size': train_size,
+            'test_size': test_size,
+            'train_percent': round((train_size / total_data * 100) if total_data > 0 else 0, 1),
+            'test_percent': round((test_size / total_data * 100) if total_data > 0 else 0, 1)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/test-data-distribution', methods=['GET'])
+def get_test_data_distribution():
+    try:
+        # Check if test data exists
+        if os.path.exists('static/data/test_data.csv'):
+            df_test = pd.read_csv('static/data/test_data.csv')
+            
+            # Calculate sentiment distribution
+            sentiment_counts = df_test['sentiment'].value_counts().to_dict()
+            
+            # Calculate percentages
+            total = sum(sentiment_counts.values())
+            sentiment_percentages = {k: round(v / total * 100, 1) for k, v in sentiment_counts.items()}
+            
+            # Ensure all sentiments are represented
+            sentiments = ['positive', 'negative', 'neutral']
+            for sentiment in sentiments:
+                if sentiment not in sentiment_counts:
+                    sentiment_counts[sentiment] = 0
+                    sentiment_percentages[sentiment] = 0
+            
+            return jsonify({
+                'total_data': total,
+                'sentiment_counts': sentiment_counts,
+                'sentiment_percentages': sentiment_percentages
+            })
+        else:
+            return jsonify({
+                'error': 'Test data file not found'
+            }), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/open-excel-csv/<path:filename>')
+def open_excel_csv(filename):
+    try:
+        # Mendapatkan full path file CSV
+        file_path = os.path.join(os.getcwd(), 'static', 'data', filename)
+        
+        # Pastikan file ada
+        if not os.path.exists(file_path):
+            return jsonify({'error': f'File {filename} tidak ditemukan'}), 404
+            
+        # Pastikan file adalah CSV
+        if not filename.endswith('.csv'):
+            return jsonify({'error': 'Hanya file CSV yang dapat dibuka dengan Excel'}), 400
+            
+        # Menggunakan os.system untuk membuka Excel dengan file CSV
+        cmd = f'start excel.exe "{file_path}"'
+        os.system(cmd)
+        
+        return jsonify({
+            'success': True,
+            'message': f'File {filename} sedang dibuka dengan Excel'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -166,16 +166,14 @@
     <div class="sidebar">
         <div class="p-4">
             <h1 class="text-xl font-bold text-gray-900 mb-6">Sentiment Analysis</h1>
-            <nav class="space-y-1">
-                <a href="#" class="nav-item active" onclick="showSection('dashboard')">
+            <nav class="space-y-1">                <a href="#" class="nav-item active" onclick="showSection('dashboard')">
                     <i class="fas fa-chart-bar"></i>
                     Dashboard
                 </a>
                 <a href="#" class="nav-item" onclick="openModal('analyzeModal')">
                     <i class="fas fa-search"></i>
                     Analisis Text
-                </a>
-                <a href="#" class="nav-item" onclick="openModal('uploadModal')">
+                </a>                <a href="#" class="nav-item" onclick="openModal('uploadModal')">
                     <i class="fas fa-upload"></i>
                     Upload Data
                 </a>
@@ -183,13 +181,21 @@
                     <i class="fas fa-brain"></i>
                     Training Model
                 </a>
-                <a href="/static/data/sentiment_rules_tree.svg" class="nav-item" target="_blank">
-                    <i class="fas fa-book"></i>
-                    Visualisasi Rules
+                <a href="#" class="nav-item" onclick="openExcelCsv('labeled_data.csv')">
+                    <i class="fas fa-file-excel"></i>
+                    Dataset di Excel
                 </a>
-                <a href="#" class="nav-item" onclick="openModal('treeModal')">
+                <a href="/static/data/labeled_data.csv" class="nav-item" target="_blank">
+                    <i class="fas fa-table"></i>
+                    Dataset (CSV)
+                </a>
+                <a href="/sentiment_rules_tree.svg" class="nav-item" target="_blank">
                     <i class="fas fa-sitemap"></i>
                     Decision Tree
+                </a>
+                <a href="#" class="nav-item" onclick="openModal('dataDistributionModal')">
+                    <i class="fas fa-chart-pie"></i>
+                    Data Split
                 </a>
             </nav>
         </div>
@@ -222,24 +228,97 @@
                     </div>
                     {% endfor %}
                 </div>
-            </div>
-
-            <!-- Charts -->
+            </div>            <!-- Charts -->
             {% if plots %}
             <div class="dashboard-card mb-8">
                 <div class="p-6">
-                    <h5 class="text-lg font-medium text-gray-900 mb-4">Visualisasi Data</h5>
-                    <div id="plotlyCharts" style="width:100%; height:800px;"></div>
+                    <h5 class="text-lg font-medium text-gray-900 mb-4">Visualisasi Distribusi Sentimen</h5>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h6 class="text-md font-medium text-gray-700 mb-3">Data Latih</h6>
+                            <div id="plotlyCharts" style="width:100%; height:400px;"></div>
+                        </div>
+                        <div>
+                            <h6 class="text-md font-medium text-gray-700 mb-3">Data Uji</h6>
+                            <div id="testDataCharts" style="width:100%; height:400px;"></div>
+                        </div>
+                    </div>
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {
+                            // Load training data chart
                             const plotsData = JSON.parse('{{ plots|tojson|safe }}');
-                            // Show sentiment bar chart if available, else fallback to main plot
                             if (plotsData.sentiment_bar_chart) {
+                                // Adjust layout for side-by-side view
+                                plotsData.sentiment_bar_chart.layout.title = 'Distribusi Sentimen Data Latih';
+                                plotsData.sentiment_bar_chart.layout.height = 400;
+                                plotsData.sentiment_bar_chart.layout.margin = {
+                                    l: 50, r: 25, t: 50, b: 100
+                                };
                                 Plotly.newPlot('plotlyCharts', plotsData.sentiment_bar_chart.data, plotsData.sentiment_bar_chart.layout);
                             } else if (plotsData.data && plotsData.layout) {
                                 Plotly.newPlot('plotlyCharts', plotsData.data, plotsData.layout);
                             }
+                            
+                            // Load test data chart
+                            loadTestDataDistribution();
                         });
+                        
+                        function loadTestDataDistribution() {
+                            $.ajax({
+                                url: '/api/test-data-distribution',
+                                method: 'GET',
+                                success: function(response) {
+                                    if (response.error) {
+                                        $('#testDataCharts').html('<div class="text-center text-gray-500">Data uji tidak tersedia</div>');
+                                        return;
+                                    }
+                                    
+                                    const sentiments = ['positive', 'negative', 'neutral'];
+                                    const count_values = sentiments.map(s => response.sentiment_counts[s] || 0);
+                                    const percent_values = sentiments.map(s => response.sentiment_percentages[s] || 0);
+                                    
+                                    const color_map = {'positive': '#2ecc71', 'negative': '#e74c3c', 'neutral': '#3498db'};
+                                    const percent_color_map = {'positive': '#27ae60', 'negative': '#c0392b', 'neutral': '#2980b9'};
+                                    
+                                    const data = [
+                                        {
+                                            name: 'Jumlah Sentimen',
+                                            x: sentiments,
+                                            y: count_values,
+                                            type: 'bar',
+                                            marker: {
+                                                color: sentiments.map(s => color_map[s])
+                                            }
+                                        },
+                                        {
+                                            name: 'Persentase Sentimen',
+                                            x: sentiments,
+                                            y: percent_values,
+                                            type: 'bar',
+                                            marker: {
+                                                color: sentiments.map(s => percent_color_map[s])
+                                            }
+                                        }
+                                    ];
+                                    
+                                    const layout = {
+                                        title: 'Distribusi Sentimen Data Uji',
+                                        xaxis: { title: 'Sentimen' },
+                                        yaxis: { title: 'Nilai' },
+                                        barmode: 'group',
+                                        height: 400,
+                                        margin: {
+                                            l: 50, r: 25, t: 50, b: 100
+                                        }
+                                    };
+                                    
+                                    Plotly.newPlot('testDataCharts', data, layout);
+                                },
+                                error: function() {
+                                    $('#testDataCharts').html('<div class="text-center text-gray-500">Gagal memuat data uji</div>');
+                                }
+                            });
+                        }
                     </script>
                 </div>
             </div>
@@ -366,16 +445,17 @@
                 </div>
             </form>
         </div>
-    </div>
-
-    <!-- Training Modal -->
+    </div>    <!-- Training Modal -->
     <div id="trainingModal" class="modal">
         <div class="modal-content">
             <h2 class="text-xl font-bold mb-4">Training Model</h2>
             <div class="mb-4">
                 <p class="text-gray-600">Mulai pelatihan model dengan dataset yang tersedia</p>
             </div>
+            
+            <!-- Data Split Section -->
             <div class="mb-4">
+                <h3 class="text-md font-medium text-gray-800 mb-2">Pembagian Data</h3>
                 <label for="splitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih</label>
                 <div class="flex items-center gap-4">
                     <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'">
@@ -383,6 +463,86 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Pilih persentase data latih (sisanya untuk data uji)</p>
             </div>
+            
+            <!-- Advanced Parameters -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-md font-medium text-gray-800">Parameter Lanjutan</h3>
+                    <button id="toggleAdvanced" type="button" class="text-sm text-blue-600 hover:text-blue-800">
+                        <span id="toggleText">Tampilkan</span> <i class="fas fa-chevron-down" id="toggleIcon"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="advancedParams" class="hidden">
+                <!-- Tokenization Section -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 class="text-sm font-medium text-gray-800 mb-2">Tokenization</h4>
+                    <div class="flex flex-col space-y-3">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="removeStopwords" name="removeStopwords" class="form-checkbox" checked>
+                            <span class="ml-2 text-sm text-gray-700">Hapus Stopwords</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="stemming" name="stemming" class="form-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Gunakan Stemming</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="lemmatization" name="lemmatization" class="form-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Gunakan Lemmatization</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Vectorization Section -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 class="text-sm font-medium text-gray-800 mb-2">Vectorization</h4>
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1">Metode Vectorization</label>
+                        <select id="vectorizationMethod" class="w-full p-2 border rounded">
+                            <option value="count">Count Vectorizer</option>
+                            <option value="tfidf">TF-IDF Vectorizer</option>
+                        </select>
+                    </div>
+                    <div class="mt-2">
+                        <label class="block text-sm text-gray-700 mb-1">Max Features</label>
+                        <input type="number" id="maxFeatures" min="100" max="10000" value="5000" class="w-full p-2 border rounded">
+                        <p class="text-xs text-gray-500 mt-1">Jumlah maksimal fitur yang digunakan</p>
+                    </div>
+                </div>
+                
+                <!-- C5.0/Decision Tree Section -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 class="text-sm font-medium text-gray-800 mb-2">Parameter Decision Tree</h4>
+                    <div class="mb-2">
+                        <label class="block text-sm text-gray-700 mb-1">Max Depth</label>
+                        <select id="maxDepth" class="w-full p-2 border rounded">
+                            <option value="none">Unlimited</option>
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="7">7</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm text-gray-700 mb-1">Min Samples Split</label>
+                        <input type="number" id="minSamplesSplit" min="2" max="50" value="2" class="w-full p-2 border rounded">
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm text-gray-700 mb-1">Min Samples Leaf</label>
+                        <input type="number" id="minSamplesLeaf" min="1" max="50" value="1" class="w-full p-2 border rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-700 mb-1">Criterion</label>
+                        <select id="criterion" class="w-full p-2 border rounded">
+                            <option value="gini">Gini</option>
+                            <option value="entropy">Entropy</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
             <div class="flex justify-end gap-2">
                 <button type="button" class="btn bg-gray-200" onclick="closeModal('trainingModal')">Tutup</button>
                 <button id="trainButton" class="btn btn-primary">Mulai Training</button>
@@ -411,9 +571,8 @@
                 <button type="button" class="btn bg-gray-200" onclick="closeModal('treeModal')">Tutup</button>
             </div>
         </div>
-    </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    </div>    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/train.js"></script>
     <script>
         // Initialize Plotly charts
         document.addEventListener('DOMContentLoaded', function() {
@@ -467,38 +626,112 @@
                     `);
                 }
             });
-        });
-
-        // Training button click
-        $('#trainButton').click(function() {
-            $(this).prop('disabled', true).text('Melatih...');
-            const splitPercent = $('#splitSlider').val();
-
-            $.ajax({
-                url: '/api/train-model',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ split_percent: splitPercent }),
-                success: function(response) {
-                    $('#trainResult').removeClass('hidden').addClass('block');
-                    $('#trainResult').text('Model berhasil dilatih!');
-                    setTimeout(() => location.reload(), 1000);
-                },
-                error: function(xhr) {
-                    alert('Terjadi kesalahan saat melatih model: ' + (xhr.responseJSON?.error || 'Unknown error'));
-                },
-                complete: function() {
-                    $('#trainButton').prop('disabled', false).text('Mulai Training');
-                }
-            });
-        });
-
+        });        // Training button click        // This is now handled in train.js
+        // $('#trainButton').click(function() {...}); 
+        
         // Close modals when clicking outside
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
         }
+
+        // Function to open CSV file in Excel
+        function openExcelCsv(filename) {
+            $.ajax({
+                url: '/open-excel-csv/' + filename,
+                method: 'GET',
+                success: function(response) {
+                    console.log(response.message);
+                },
+                error: function(xhr) {
+                    alert('Terjadi kesalahan: ' + (xhr.responseJSON?.error || 'Tidak dapat membuka file di Excel'));
+                }
+            });
+        }
+
+        // Function to load data distribution chart
+        function loadDataDistribution() {
+            if (document.getElementById('dataSplitChart')) {
+                $.ajax({
+                    url: '/api/data-distribution',
+                    method: 'GET',
+                    success: function(response) {
+                        const data = [{
+                            labels: ['Data Latih', 'Data Uji'],
+                            values: [response.train_size, response.test_size],
+                            type: 'pie',
+                            marker: {
+                                colors: ['#3b82f6', '#10b981']
+                            },
+                            textinfo: 'label+percent',
+                            hole: 0.4,
+                            textposition: 'inside',
+                            insidetextfont: {
+                                color: 'white',
+                                size: 14
+                            }
+                        }];
+                        
+                        const layout = {
+                            title: 'Proporsi Data Latih & Uji',
+                            showlegend: false,
+                            annotations: [
+                                {
+                                    text: 'Total: ' + response.total_data,
+                                    showarrow: false,
+                                    font: {
+                                        size: 16
+                                    }
+                                }
+                            ]
+                        };
+                        
+                        Plotly.newPlot('dataSplitChart', data, layout);
+                    }
+                });
+            }
+        }
+
+        // Modify the openModal function to load data when needed
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+            
+            if (modalId === 'dataDistributionModal') {
+                loadDataDistribution();
+            }
+        }        // Enhance the training result display
+        // This is now handled in train.js
     </script>
+
+    <!-- Data Distribution Modal -->
+    <div id="dataDistributionModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Distribusi Data Latih & Uji</h2>
+            <div id="dataSplitChart" style="width:100%; height:400px;"></div>
+            <div class="flex justify-end mt-4">
+                <button type="button" class="btn bg-gray-200" onclick="closeModal('dataDistributionModal')">Tutup</button>
+            </div>
+        </div>    </div>
+    
+    <!-- Training Logs Modal -->
+    <div id="trainingLogsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg w-3/4 max-h-[80vh] overflow-hidden">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Detail Log Pelatihan Model</h2>
+                    <button class="text-gray-500 hover:text-gray-700" onclick="document.getElementById('trainingLogsModal').classList.add('hidden')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="overflow-y-auto max-h-[60vh] p-4 bg-gray-50 rounded-lg">
+                    <div id="trainingLogsContent" class="text-sm"></div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="button" class="btn bg-gray-200" onclick="document.getElementById('trainingLogsModal').classList.add('hidden'); location.reload();">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
