@@ -1,0 +1,66 @@
+<!-- Preview and Labeling Modal -->
+<div id="previewModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+        <h2 class="text-xl font-bold mb-4">Preview dan Pelabelan Dataset</h2>
+        
+        <div class="mb-4">
+            <p class="text-gray-600">Pratinjau data Anda sebelum dilakukan pelabelan dengan RoBERTa. Pastikan data memiliki setidaknya kolom <strong>full_text</strong> sebagai konten yang akan dianalisis.</p>
+        </div>
+        
+        <!-- Required Columns Section -->
+        <div class="mb-4 p-3 bg-blue-50 rounded-lg text-blue-800">
+            <h4 class="font-semibold">Petunjuk Format Data:</h4>
+            <p class="text-sm mb-2">Dataset memerlukan minimal kolom berikut:</p>
+            <ul class="list-disc text-sm ml-5">
+                <li>full_text: Text komentar yang akan dianalisis (wajib)</li>
+                <li>favorite_count: Jumlah like/favorite (opsional, default 0)</li>
+                <li>created_at: Tanggal dibuat (opsional)</li>
+                <li>location: Lokasi (opsional)</li>
+                <li>username: Username (opsional)</li>
+            </ul>
+        </div>
+        
+        <!-- Preview Section -->
+        <div id="previewData" class="mb-4">
+            <h3 class="text-lg font-medium text-gray-800 mb-2">Preview Data</h3>
+            <div class="custom-table-container">
+                <table class="custom-table" id="previewTable">
+                    <thead>
+                        <tr id="previewTableHeader"></tr>
+                    </thead>
+                    <tbody id="previewTableBody"></tbody>
+                </table>
+            </div>
+            <p class="text-sm text-gray-600 mt-2">Menampilkan <span id="previewRowCount">0</span> dari <span id="totalRowCount">0</span> baris data.</p>
+        </div>
+
+        <!-- Missing Columns Warning -->
+        <div id="missingColumnsWarning" class="mb-4 p-3 bg-orange-50 rounded-lg text-orange-800 hidden">
+            <h4 class="font-semibold">Peringatan:</h4>
+            <p class="text-sm">Beberapa kolom yang diperlukan tidak ditemukan atau kosong:</p>
+            <ul id="missingColumnsList" class="list-disc text-sm ml-5"></ul>
+            <p class="text-sm mt-2">Sistem akan mencoba tetap memproses berdasarkan kolom yang tersedia.</p>
+        </div>
+
+        <!-- Process Labeling Section -->
+        <div class="mb-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-gray-800">Pelabelan dengan RoBERTa</h3>
+                <span id="labelingStatus" class="text-sm"></span>
+            </div>
+            <div id="progressBar" class="w-full bg-gray-200 rounded-full h-2.5 my-2 hidden">
+                <div id="progressBarFill" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <div id="labelingLog" class="mt-3 p-3 bg-gray-50 rounded max-h-48 overflow-y-auto hidden">
+                <div id="logContent" class="text-sm"></div>
+            </div>
+        </div>
+        
+        <div class="flex justify-end gap-2">
+            <button type="button" class="btn bg-gray-200" onclick="closeModal('previewModal')">Tutup</button>
+            <button id="labelButton" class="btn btn-primary" onclick="startLabeling()">
+                <i class="fas fa-tag mr-1"></i> Mulai Pelabelan
+            </button>
+        </div>
+    </div>
+</div>

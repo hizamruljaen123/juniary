@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session, Response, stream_with_context
 import json
 import re
 import pandas as pd
@@ -19,25 +19,46 @@ import matplotlib.pyplot as plt
 from sklearn import tree as sktree
 from collections import Counter
 import pickle
+import time
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from labeling import stream_process_dataset
+from db_manager import DatabaseManager
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, ENGLISH_STOP_WORDS
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from labeling import stream_process_dataset
 
 class SentimentAnalyzer:
     def __init__(self):
-        self.rules = load_rules()
+        self.db_manager = DatabaseManager()
+        self.rules = self.load_rules_from_db()
         self.tokenizer = AutoTokenizer.from_pretrained("w11wo/indonesian-roberta-base-sentiment-classifier")
         self.model = AutoModelForSequenceClassification.from_pretrained("w11wo/indonesian-roberta-base-sentiment-classifier")
         self.model.eval()
-        self.labeled_data_path = 'static/data/labeled_data.csv'
-        self.default_data_path = 'static/data/labeled_data.csv'
         
-        # Initialize with default data if available and no labeled data exists
-        if not os.path.exists(self.labeled_data_path) and os.path.exists(self.default_data_path):
-            shutil.copy2(self.default_data_path, self.labeled_data_path)
-            if os.path.exists(self.labeled_data_path):
-                df = pd.read_csv(self.labeled_data_path)
-                self.rules = generate_rules_from_data(df)
+        # Fallback to CSV file if database connection fails
+        if not self.db_manager.connect():
+            print("Warning: Database connection failed. Using CSV fallback.")
+            self.labeled_data_path = 'static/data/labeled_data.csv'
+            self.default_data_path = 'static/data/labeled_data.csv'
+            
+            # Initialize with default data if available and no labeled data exists
+            if not os.path.exists(self.labeled_data_path) and os.path.exists(self.default_data_path):
+                shutil.copy2(self.default_data_path, self.labeled_data_path)
+                if os.path.exists(self.labeled_data_path):
+                    df = pd.read_csv(self.labeled_data_path)
+                    self.rules = generate_rules_from_data(df)
+    
+    def load_rules_from_db(self):
+        """
+        Load classification rules from database
+        """
+        rules = self.db_manager.load_rules()
+        if rules is None:
+            return load_rules()  # Fallback to file-based rules
+        return rules
 
     def analyze_text(self, text):
         text = self.preprocess_text(text)
@@ -58,24 +79,38 @@ class SentimentAnalyzer:
             'confidence': confidence
         }
         
-        return result
-
+        return result    
     def get_or_create_labeled_dataset(self):
         """Get existing labeled dataset or create from default data"""
-        if os.path.exists(self.labeled_data_path):
+        # Try to get data from database first
+        if hasattr(self, 'db_manager') and self.db_manager.connection:
+            df = self.db_manager.fetch_all_data()
+            if df is not None and not df.empty:
+                return df
+                
+        # Fallback to CSV if database failed or is empty
+        if hasattr(self, 'labeled_data_path') and os.path.exists(self.labeled_data_path):
             return pd.read_csv(self.labeled_data_path)
-        elif os.path.exists(self.default_data_path):
+        elif hasattr(self, 'default_data_path') and os.path.exists(self.default_data_path):
             df = pd.read_csv(self.default_data_path)
-            df.to_csv(self.labeled_data_path, index=False)
-            return df
-        return None
-
-    def create_labeled_dataset(self, df1=None, df2=None):
-        # If no data provided, use default data
-        if df1 is None or df2 is None:
-            if os.path.exists(self.default_data_path):
-                df = pd.read_csv(self.default_data_path)
+            if hasattr(self, 'labeled_data_path'):
                 df.to_csv(self.labeled_data_path, index=False)
+            return df
+        return None    
+    def create_labeled_dataset(self, df1=None, df2=None):
+        """Create labeled dataset from provided dataframes or default data"""
+        # If no data provided, try to load from database first
+        if df1 is None or df2 is None:
+            if hasattr(self, 'db_manager') and self.db_manager.connection:
+                df = self.db_manager.fetch_all_data()
+                if df is not None and not df.empty:
+                    return df
+                    
+            # Fallback to CSV if database failed or is empty
+            if hasattr(self, 'default_data_path') and os.path.exists(self.default_data_path):
+                df = pd.read_csv(self.default_data_path)
+                if hasattr(self, 'labeled_data_path'):
+                    df.to_csv(self.labeled_data_path, index=False)
                 self.rules = generate_rules_from_data(df)
                 return df
             return None
@@ -90,7 +125,6 @@ class SentimentAnalyzer:
                 analysis = self.analyze_text(row['full_text'])
                 extended_analysis = self.apply_rules(analysis, row['favorite_count'])
                 analysis.update(extended_analysis)
-                
                 entry = {
                     'text': row['full_text'],
                     'preprocessed_text': analysis['text'],
@@ -105,7 +139,25 @@ class SentimentAnalyzer:
                 labeled_data.append(entry)
         
         df_labeled = pd.DataFrame(labeled_data)
-        df_labeled.to_csv(self.labeled_data_path, index=False)
+        
+        # Save to database if available
+        if hasattr(self, 'db_manager') and self.db_manager.connection:
+            # Insert new records into database
+            for _, row in df_labeled.iterrows():
+                self.db_manager.save_sentiment_data(
+                    text=row['text'], 
+                    preprocessed_text=row['preprocessed_text'],
+                    sentiment=row['sentiment'],
+                    confidence=row['confidence'],
+                    favorite_count=row['favorite_count'],
+                    created_at=row['created_at'],
+                    location=row['location'],
+                    username=row['username'],
+                    source_dataset=row['source_dataset']
+                )
+        # Fallback to CSV storage
+        elif hasattr(self, 'labeled_data_path'):
+            df_labeled.to_csv(self.labeled_data_path, index=False)
         
         # Generate new rules based on labeled data
         self.rules = generate_rules_from_data(df_labeled)
@@ -225,6 +277,15 @@ class SentimentAnalyzer:
 
 def load_rules():
     try:
+        # Try to load from database first
+        db_manager = DatabaseManager()
+        if db_manager.connect():
+            rules = db_manager.load_rules()
+            db_manager.disconnect()
+            if rules:
+                return rules
+                
+        # Fallback to file-based rules
         with open('model_rules.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
@@ -302,13 +363,42 @@ def generate_rules_from_data(df):
     return rule_set
 
 app = Flask(__name__)
+app.secret_key = 'sentiment_analyzer_secret_key'  # Digunakan untuk sesi
+
+# Define login credentials
+ADMIN_USERNAME = 'admin'
+ADMIN_PASSWORD = 'admin'
 
 # Initialize analyzer
 analyzer = SentimentAnalyzer()
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            return redirect(url_for('home'))
+        else:
+            error = 'Username atau password salah!'
+    
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('login'))
+
 @app.route('/')
 def home():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+            
         # Get or create labeled dataset
         df = analyzer.get_or_create_labeled_dataset()
         
@@ -382,6 +472,10 @@ def home():
 @app.route('/api/analyze', methods=['POST'])
 def analyze_text():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         data = request.json
         text = data['comment']
         result = analyzer.analyze_text(text)
@@ -392,6 +486,10 @@ def analyze_text():
 @app.route('/api/analyze-data', methods=['GET'])
 def analyze_data():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         # Try to use existing labeled data first
         df = analyzer.get_or_create_labeled_dataset()
         
@@ -421,6 +519,10 @@ def analyze_data():
 @app.route('/api/upload-dataset', methods=['POST'])
 def upload_dataset():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
@@ -495,6 +597,10 @@ def build_c50_tree(X, y, feature_names, depth=0, max_depth=None):
 @app.route('/api/rules-visualization')
 def get_rules_visualization():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         rules_viz = analyzer.generate_rules_visualization()
         return jsonify({
             'success': True,
@@ -506,6 +612,10 @@ def get_rules_visualization():
 @app.route('/api/train-model', methods=['POST'])
 def train_model():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         # Inisialisasi log tahapan proses pelatihan
         training_logs = []
         
@@ -518,26 +628,81 @@ def train_model():
         tokenization_params = data.get('tokenization', {})
         vectorization_params = data.get('vectorization', {})
         decision_tree_params = data.get('decision_tree', {})
-        
         training_logs.append(f"Parameter diterima: split data {split_percent}% latih, {100-split_percent}% uji")
         
-        # Load and shuffle the data
-        training_logs.append("Memuat dataset...")
-        df = pd.read_csv('static/data/labeled_data.csv')
-        training_logs.append(f"Dataset dimuat: {len(df)} data")
-        
-        training_logs.append("Mengacak dataset untuk memastikan distribusi yang merata...")
-        df = df.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle
+        # Try to use database first
+        db_manager = DatabaseManager()
+        if db_manager.connect():
+            training_logs.append("Memuat dataset dari database...")
+            df = db_manager.fetch_all_data()
+            if df is not None and not df.empty:
+                training_logs.append(f"Dataset dimuat: {len(df)} data")
+                
+                training_logs.append("Mengacak dataset untuk memastikan distribusi yang merata...")
+                df = df.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle
 
-        train_size = int(len(df) * split_percent / 100)
-        df_train = df.iloc[:train_size]
-        df_test = df.iloc[train_size:]
+                train_size = int(len(df) * split_percent / 100)
+                df_train = df.iloc[:train_size]
+                df_test = df.iloc[train_size:]
 
-        training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
+                training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
 
-        # Save test set
-        df_test.to_csv('static/data/test_data.csv', index=False)
-        training_logs.append("Menyimpan data uji ke file")
+                # Save split information to database
+                training_logs.append("Menyimpan informasi split data ke database...")
+                
+                # Clear previous split information
+                db_manager.clear_dataset_splits()
+                
+                # Save train/test splits
+                for _, row in df_train.iterrows():
+                    db_manager.save_dataset_split(text_id=row['id'], split_type='train')
+                    
+                for _, row in df_test.iterrows():
+                    db_manager.save_dataset_split(text_id=row['id'], split_type='test')
+                
+                # Also save to CSV for backward compatibility
+                df_test.to_csv('static/data/test_data.csv', index=False)
+                training_logs.append("Data split berhasil disimpan")
+                
+                db_manager.disconnect()
+            else:
+                training_logs.append("Database kosong, mencoba menggunakan file CSV...")
+                db_manager.disconnect()
+                # Fall back to CSV
+                training_logs.append("Memuat dataset dari file CSV...")
+                df = pd.read_csv('static/data/labeled_data.csv')
+                training_logs.append(f"Dataset dimuat: {len(df)} data")
+                
+                training_logs.append("Mengacak dataset untuk memastikan distribusi yang merata...")
+                df = df.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle
+
+                train_size = int(len(df) * split_percent / 100)
+                df_train = df.iloc[:train_size]
+                df_test = df.iloc[train_size:]
+
+                training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
+
+                # Save test set to CSV
+                df_test.to_csv('static/data/test_data.csv', index=False)
+                training_logs.append("Menyimpan data uji ke file")
+        else:
+            # Fall back to CSV if database connection fails
+            training_logs.append("Koneksi database gagal, menggunakan file CSV...")
+            df = pd.read_csv('static/data/labeled_data.csv')
+            training_logs.append(f"Dataset dimuat: {len(df)} data")
+            
+            training_logs.append("Mengacak dataset untuk memastikan distribusi yang merata...")
+            df = df.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle
+
+            train_size = int(len(df) * split_percent / 100)
+            df_train = df.iloc[:train_size]
+            df_test = df.iloc[train_size:]
+
+            training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
+
+            # Save test set
+            df_test.to_csv('static/data/test_data.csv', index=False)
+            training_logs.append("Menyimpan data uji ke file")
 
         # Text preprocessing based on parameters
         training_logs.append("Mulai tahap pra-pemrosesan teks...")
@@ -616,16 +781,42 @@ def train_model():
             criterion=criterion
         )
         clf.fit(X_train, y_train)
-        training_logs.append("Pelatihan model selesai")
-          # Evaluate the model
+        training_logs.append("Pelatihan model selesai")        # Evaluate the model
         y_pred = clf.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         training_logs.append(f"Evaluasi model pada data uji: akurasi = {accuracy:.4f} ({accuracy*100:.2f}%)")
 
-        # Save model (pickle)
-        training_logs.append("Menyimpan model ke disk...")
-        with open('static/data/sentiment_model.pkl', 'wb') as f:
-            pickle.dump({'model': clf, 'vectorizer': vectorizer}, f)
+        # Generate a timestamp-based model name
+        model_name = f"sentiment_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Save model to database if available
+        db_manager = DatabaseManager()
+        if db_manager.connect():
+            training_logs.append("Menyimpan model ke database...")
+            # Serialize model and vectorizer
+            model_saved = db_manager.save_model(
+                model_name=model_name,
+                model_obj=clf,
+                vectorizer_obj=vectorizer,
+                accuracy=accuracy
+            )
+            
+            if model_saved:
+                training_logs.append("Model berhasil disimpan ke database")
+            else:
+                training_logs.append("Gagal menyimpan model ke database, mencoba menyimpan ke disk...")
+                # Fall back to file-based storage
+                with open('static/data/sentiment_model.pkl', 'wb') as f:
+                    pickle.dump({'model': clf, 'vectorizer': vectorizer}, f)
+                training_logs.append("Model berhasil disimpan ke disk")
+            
+            db_manager.disconnect()
+        else:
+            # Fall back to file-based storage
+            training_logs.append("Koneksi database gagal, menyimpan model ke disk...")
+            with open('static/data/sentiment_model.pkl', 'wb') as f:
+                pickle.dump({'model': clf, 'vectorizer': vectorizer}, f)
+            training_logs.append("Model berhasil disimpan ke disk")
 
         # Save rules as JSON using manual C5.0-like function
         training_logs.append("Membuat struktur pohon keputusan C5.0...")
@@ -743,20 +934,40 @@ def train_model():
 @app.route('/api/data-distribution', methods=['GET'])
 def get_data_distribution():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
         total_data = 0
         train_size = 0
         test_size = 0
         
-        # Check if labeled data exists
-        if os.path.exists('static/data/labeled_data.csv'):
-            df_all = pd.read_csv('static/data/labeled_data.csv')
-            total_data = len(df_all)
+        # Try to get data from database first
+        db_manager = DatabaseManager()
+        if db_manager.connect():
+            # Get total data count
+            total_data = db_manager.get_data_count()
             
-            # Check if test data exists
-            if os.path.exists('static/data/test_data.csv'):
-                df_test = pd.read_csv('static/data/test_data.csv')
-                test_size = len(df_test)
+            # Get test data count
+            test_data = db_manager.get_dataset_split_counts()
+            if test_data and 'test' in test_data:
+                test_size = test_data['test']
                 train_size = total_data - test_size
+            else:
+                # No explicit split, assume all is training data
+                train_size = total_data
+            
+            db_manager.disconnect()
+        else:
+            # Fallback to CSV if database connection fails
+            if os.path.exists('static/data/labeled_data.csv'):
+                df_all = pd.read_csv('static/data/labeled_data.csv')
+                total_data = len(df_all)
+                
+                # Check if test data exists
+                if os.path.exists('static/data/test_data.csv'):
+                    df_test = pd.read_csv('static/data/test_data.csv')
+                    test_size = len(df_test)
+                    train_size = total_data - test_size
             else:
                 # If no explicit test data, use 80/20 split for visualization
                 train_size = int(total_data * 0.8)
@@ -775,6 +986,10 @@ def get_data_distribution():
 @app.route('/api/test-data-distribution', methods=['GET'])
 def get_test_data_distribution():
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         # Check if test data exists
         if os.path.exists('static/data/test_data.csv'):
             df_test = pd.read_csv('static/data/test_data.csv')
@@ -801,13 +1016,17 @@ def get_test_data_distribution():
         else:
             return jsonify({
                 'error': 'Test data file not found'
-            }), 404
+            }, 404)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
 @app.route('/open-excel-csv/<path:filename>')
 def open_excel_csv(filename):
     try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
         # Mendapatkan full path file CSV
         file_path = os.path.join(os.getcwd(), 'static', 'data', filename)
         
@@ -829,6 +1048,261 @@ def open_excel_csv(filename):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stream-analyze-data', methods=['POST'])
+def stream_analyze_data():
+    try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+        
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'Only CSV files are allowed'}), 400
+        
+        # Save the uploaded file
+        file_path = os.path.join('static', 'data', file.filename)
+        file.save(file_path)
+        
+        # Stream the processing logs
+        def generate_logs():
+            yield "data: Memulai proses analisis data...\n\n"
+            try:
+                # Load and preprocess the data
+                df = pd.read_csv(file_path)
+                yield "data: Dataset dimuat, mulai pra-pemrosesan...\n\n"
+                
+                # Preprocess text column
+                df['preprocessed_text'] = df['full_text'].apply(analyzer.preprocess_text)
+                yield "data: Pra-pemrosesan teks selesai\n\n"
+                
+                # Analyze sentiment
+                df['sentiment'] = df['preprocessed_text'].apply(lambda x: analyzer.analyze_text(x)['sentiment'])
+                yield "data: Analisis sentimen selesai\n\n"
+                
+                # Calculate confidence scores
+                df['confidence'] = df['preprocessed_text'].apply(lambda x: analyzer.analyze_text(x)['confidence'])
+                yield "data: Perhitungan skor kepercayaan selesai\n\n"
+                
+                # Save the labeled data
+                df.to_csv(analyzer.labeled_data_path, index=False)
+                yield "data: Data berhasil disimpan\n\n"
+                
+                # Generate plots
+                plots_json = analyzer.generate_plots(df)
+                yield f"data: {json.dumps(plots_json)}\n\n"
+                
+                # Prepare summary statistics
+                stats = {
+                    'total_entries': len(df),
+                    'sentiment_counts': df['sentiment'].value_counts().to_dict(),
+                    'avg_confidence': df['confidence'].mean(),
+                    'avg_likes': df['favorite_count'].mean(),
+                    'dataset_counts': df['source_dataset'].value_counts().to_dict()
+                }
+                yield f"data: {json.dumps(stats)}\n\n"
+                
+                # Load evaluation result if exists
+                eval_result = None
+                try:
+                    with open('static/data/eval_result.json', 'r') as f:
+                        eval_result = json.load(f)
+                except Exception:
+                    eval_result = None
+                yield f"data: {json.dumps(eval_result)}\n\n"
+                
+                yield "data: Proses analisis data selesai\n\n"
+            except Exception as e:
+                yield f"data: Error: {str(e)}\n\n"
+        
+        return Response(stream_with_context(generate_logs()), content_type='text/event-stream')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/preview-dataset', methods=['POST'])
+def preview_dataset():
+    try:
+        # Check if user is logged in
+        if not session.get('logged_in'):
+            return jsonify({'error': 'Unauthorized access'}), 401
+            
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'Only CSV files are allowed'}), 400
+        
+        # Save the uploaded file temporarily
+        temp_path = os.path.join('static', 'data', 'temp_upload.csv')
+        file.save(temp_path)
+        
+        # Read the CSV file
+        try:
+            df = pd.read_csv(temp_path, encoding='utf-8')
+        except Exception as e:
+            try:
+                # Try another encoding if utf-8 fails
+                df = pd.read_csv(temp_path, encoding='latin1')
+            except Exception as e:
+                return jsonify({'error': f'Error reading CSV file: {str(e)}'}), 400
+        
+        # Check if required column exists
+        if 'full_text' not in df.columns:
+            return jsonify({'error': 'The CSV file must contain a "full_text" column with the text to analyze'}), 400
+        
+        # Check for missing columns
+        missing_columns = []
+        required_columns = ['full_text', 'favorite_count', 'created_at', 'location', 'username']
+        for col in required_columns:
+            if col != 'full_text' and (col not in df.columns or df[col].isna().all()):
+                missing_columns.append(col)
+        
+        # Get a preview of the data (10 rows)
+        preview_df = df.head(10).copy()
+        
+        # Convert DataFrame to dictionary for JSON serialization
+        preview_data = preview_df.fillna('').to_dict('records')
+        
+        return jsonify({
+            'success': True,
+            'total_rows': len(df),
+            'columns': df.columns.tolist(),
+            'preview_data': preview_data,
+            'missing_columns': missing_columns,
+            'message': 'Preview generated successfully'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/process-dataset', methods=['POST'])
+def process_dataset():
+    # Check if user is logged in
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized access'}), 401
+    
+    # Define the streaming response
+    def generate():
+        try:
+            # Load the temporary uploaded file
+            temp_path = os.path.join('static', 'data', 'temp_upload.csv')
+            
+            if not os.path.exists(temp_path):
+                yield json.dumps({'log': 'Error: No uploaded file found. Please upload a file first.', 'type': 'error'}) + '\n'
+                return
+            
+            # Read the CSV file
+            try:
+                df = pd.read_csv(temp_path, encoding='utf-8')
+            except Exception:
+                try:
+                    df = pd.read_csv(temp_path, encoding='latin1')
+                except Exception as e:
+                    yield json.dumps({'log': f'Error reading CSV file: {str(e)}', 'type': 'error'}) + '\n'
+                    return
+            
+            # Check if required column exists
+            if 'full_text' not in df.columns:
+                yield json.dumps({'log': 'Error: The CSV file must contain a "full_text" column with the text to analyze', 'type': 'error'}) + '\n'
+                return
+            
+            # Report missing columns but continue
+            missing_cols = []
+            for col in ['favorite_count', 'created_at', 'location', 'username']:
+                if col not in df.columns:
+                    missing_cols.append(col)
+                    # Add empty column
+                    df[col] = ''
+            
+            if missing_cols:
+                yield json.dumps({'log': f'Info: Adding missing columns: {", ".join(missing_cols)}', 'type': 'info'}) + '\n'
+            
+            # Function to send progress updates
+            def send_progress(percent, message, msg_type='info'):
+                nonlocal progress_data
+                progress_data = json.dumps({
+                    'progress': percent,
+                    'log': message,
+                    'type': msg_type
+                }) + '\n'
+              # Process the dataset
+            progress_data = ''
+            output_df = stream_process_dataset(analyzer, df, send_progress)
+            
+            # Periodically yield progress updates
+            max_wait = 0.5  # seconds
+            wait_time = 0
+            last_progress = ''
+            
+            while output_df is None:  # Processing hasn't finished yet
+                if progress_data and progress_data != last_progress:
+                    yield progress_data
+                    last_progress = progress_data
+                    wait_time = 0
+                else:
+                    # Send heartbeat every 0.5 seconds if no progress updates
+                    wait_time += 0.1
+                    if wait_time >= max_wait:
+                        yield json.dumps({'heartbeat': True}) + '\n'
+                        wait_time = 0
+                time.sleep(0.1)
+            
+            # Save processed data to database
+            if hasattr(analyzer, 'db_manager') and analyzer.db_manager.connection:
+                yield json.dumps({'log': 'Saving data to database...', 'type': 'info'}) + '\n'
+                
+                # Insert each row into the database
+                for _, row in output_df.iterrows():
+                    analyzer.db_manager.save_sentiment_data(
+                        text=row['text'],
+                        preprocessed_text=row['preprocessed_text'],
+                        sentiment=row['sentiment'],
+                        confidence=row['confidence'],
+                        favorite_count=row['favorite_count'] if 'favorite_count' in row else 0,
+                        created_at=row['created_at'] if 'created_at' in row else None,
+                        location=row['location'] if 'location' in row else None,
+                        username=row['username'] if 'username' in row else None,
+                        source_dataset=row['source_dataset'] if 'source_dataset' in row else 'processed_data'
+                    )
+                
+                yield json.dumps({'log': 'Data saved to database successfully!', 'type': 'success'}) + '\n'
+            else:
+                # Fallback to CSV if database is not available
+                labeled_data_path = os.path.join('static', 'data', 'labeled_data.csv')
+                output_df.to_csv(labeled_data_path, index=False)
+                yield json.dumps({'log': 'Data saved to CSV file (database not available)', 'type': 'info'}) + '\n'
+            
+            # Clean up temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            # Regenerate rules based on new data
+            analyzer.rules = generate_rules_from_data(output_df)
+            
+            yield json.dumps({
+                'progress': 100,
+                'log': f'Pelabelan selesai! Data telah disimpan sebagai labeled_data.csv dengan {len(output_df)} baris.',
+                'type': 'success'
+            }) + '\n'
+            
+        except Exception as e:
+            yield json.dumps({
+                'progress': 0,
+                'log': f'Error dalam pemrosesan: {str(e)}',
+                'type': 'error'
+            }) + '\n'
+    
+    # Return the streaming response
+    return Response(stream_with_context(generate()), content_type='application/json')
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -172,10 +172,9 @@
                 </a>
                 <a href="#" class="nav-item" onclick="openModal('analyzeModal')">
                     <i class="fas fa-search"></i>
-                    Analisis Text
-                </a>                <a href="#" class="nav-item" onclick="openModal('uploadModal')">
+                    Analisis Text                </a>                <a href="#" class="nav-item" onclick="openModal('uploadModal')">
                     <i class="fas fa-upload"></i>
-                    Upload Data
+                    Upload & Labeling Data
                 </a>
                 <a href="#" class="nav-item" onclick="openModal('trainingModal')">
                     <i class="fas fa-brain"></i>
@@ -196,6 +195,11 @@
                 <a href="#" class="nav-item" onclick="openModal('dataDistributionModal')">
                     <i class="fas fa-chart-pie"></i>
                     Data Split
+                </a>
+                <div class="border-t border-gray-200 my-4"></div>
+                <a href="/logout" class="nav-item bg-red-50 text-red-700">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
                 </a>
             </nav>
         </div>
@@ -434,18 +438,23 @@
     <div id="uploadModal" class="modal">
         <div class="modal-content">
             <h2 class="text-xl font-bold mb-4">Upload Dataset</h2>
-            <form id="uploadForm">
+            <form id="uploadForm" enctype="multipart/form-data">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700">Pilih File CSV</label>
-                    <input type="file" accept=".csv" class="mt-1 block w-full" />
+                    <input type="file" id="datasetFile" name="file" accept=".csv" class="mt-1 block w-full" required />
+                    <p class="text-xs text-gray-500 mt-1">
+                        Data mentah akan diproses dan dilabeli secara otomatis menggunakan RoBERTa
+                    </p>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" class="btn bg-gray-200" onclick="closeModal('uploadModal')">Tutup</button>
-                    <button type="submit" class="btn btn-primary">Upload</button>
+                    <button type="button" id="previewButton" class="btn btn-primary">
+                        <i class="fas fa-eye mr-1"></i> Preview & Pelabelan
+                    </button>
                 </div>
             </form>
         </div>
-    </div>    <!-- Training Modal -->
+    </div><!-- Training Modal -->
     <div id="trainingModal" class="modal">
         <div class="modal-content">
             <h2 class="text-xl font-bold mb-4">Training Model</h2>
@@ -570,9 +579,10 @@
             <div class="flex justify-end mt-4">
                 <button type="button" class="btn bg-gray-200" onclick="closeModal('treeModal')">Tutup</button>
             </div>
-        </div>
+    </div>
     </div>    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="/static/js/train.js"></script>
+    <script src="/static/js/upload.js"></script>
     <script>
         // Initialize Plotly charts
         document.addEventListener('DOMContentLoaded', function() {
@@ -727,11 +737,12 @@
                 <div class="overflow-y-auto max-h-[60vh] p-4 bg-gray-50 rounded-lg">
                     <div id="trainingLogsContent" class="text-sm"></div>
                 </div>
-                <div class="mt-4 flex justify-end">
-                    <button type="button" class="btn bg-gray-200" onclick="document.getElementById('trainingLogsModal').classList.add('hidden'); location.reload();">Tutup</button>
+                <div class="mt-4 flex justify-end">                <button type="button" class="btn bg-gray-200" onclick="document.getElementById('trainingLogsModal').classList.add('hidden'); location.reload();">Tutup</button>
                 </div>
             </div>
         </div>
     </div>
+    
+    {% include 'preview_modal.html' %}
 </body>
 </html>
