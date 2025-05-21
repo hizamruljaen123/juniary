@@ -432,11 +432,9 @@
             </form>
             <div id="analysisResult" class="hidden mt-4 p-4 bg-gray-50 rounded-lg"></div>
         </div>
-    </div>
-
-    <!-- Upload Modal -->
+    </div>    <!-- Upload Modal -->
     <div id="uploadModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content max-w-3xl">
             <h2 class="text-xl font-bold mb-4">Upload Dataset</h2>
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="mb-4">
@@ -445,7 +443,101 @@
                     <p class="text-xs text-gray-500 mt-1">
                         Data mentah akan diproses dan dilabeli secara otomatis menggunakan RoBERTa
                     </p>
+                </div>                  <div id="uploadError" class="hidden mb-4 p-4 bg-red-50 text-red-700 rounded-lg border-2 border-red-300 shadow-sm">
+                    <div class="flex items-start space-x-4">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-lg mb-2 text-red-800">Error Upload File</h4>
+                            <div id="errorMessage" class="mb-4 p-3 bg-white/80 rounded border border-red-200 shadow-inner"></div>
+                            
+                            <div class="bg-red-100/50 p-3 rounded">
+                                <p class="font-medium mb-2">Syarat File CSV:</p>
+                                <ul class="list-disc pl-5 mt-1 space-y-1.5 text-sm">
+                                    <li>Memiliki kolom <code class="bg-white/90 px-1.5 py-0.5 rounded font-mono text-red-600">full_text</code> untuk teks yang akan dianalisis</li>
+                                    <li>Semua kolom wajib harus ada dan sesuai format</li>
+                                    <li>Format sesuai contoh template yang disediakan</li>
+                                </ul>
+                            </div>
+                            
+                            <div id="apiErrorContainer" class="mt-3 p-3 bg-red-100/70 rounded border border-red-200 hidden">
+                                <p class="font-medium text-sm">Detail Error dari API:</p>
+                                <div id="apiErrorMessage" class="mt-1 text-sm italic bg-white/60 p-2 rounded"></div>
+                            </div>
+                            
+                            <div class="mt-4 flex items-center justify-between">
+                                <a href="/static/data/data_latih_1.csv" download class="inline-flex items-center text-sm font-medium text-red-700 hover:text-red-800">
+                                    <i class="fas fa-download mr-1.5"></i> Download Template CSV
+                                </a>
+                                <button onclick="uploadError.classList.add('hidden')" class="text-sm font-medium text-red-600 hover:text-red-700">
+                                    <i class="fas fa-times mr-1"></i> Tutup Pesan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-2">Format File yang Diperlukan</h3>
+                    <div class="bg-blue-50 p-3 rounded-lg mb-3">
+                        <p class="text-sm text-blue-700">
+                            <i class="fas fa-info-circle mr-1"></i> File CSV harus memiliki kolom-kolom berikut:
+                        </p>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Nama Kolom</th>
+                                    <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Wajib</th>
+                                    <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Deskripsi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">conversation_id_str</td>
+                                    <td class="py-2 px-3 text-sm">Ya</td>
+                                    <td class="py-2 px-3 text-sm">ID percakapan</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">created_at</td>
+                                    <td class="py-2 px-3 text-sm">Ya</td>
+                                    <td class="py-2 px-3 text-sm">Waktu pembuatan (format: Wed Nov 13 14:23:42 +0000 2024)</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">favorite_count</td>
+                                    <td class="py-2 px-3 text-sm">Ya</td>
+                                    <td class="py-2 px-3 text-sm">Jumlah favorit/like</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">full_text</td>
+                                    <td class="py-2 px-3 text-sm">Ya</td>
+                                    <td class="py-2 px-3 text-sm">Teks lengkap (akan dianalisis)</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">id_str</td>
+                                    <td class="py-2 px-3 text-sm">Ya</td>
+                                    <td class="py-2 px-3 text-sm">ID teks/post</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-3 text-sm font-medium">image_url, location, username, dll</td>
+                                    <td class="py-2 px-3 text-sm">Opsional</td>
+                                    <td class="py-2 px-3 text-sm">Metadata tambahan</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 flex">
+                        <a href="/static/data/data_latih_1.csv" download class="btn bg-green-100 text-green-700 hover:bg-green-200 flex items-center">
+                            <i class="fas fa-download mr-2"></i> Download Template
+                        </a>
+                        <span class="ml-2 text-xs text-gray-500 self-center">Unduh contoh template CSV</span>
+                    </div>
+                </div>
+                
                 <div class="flex justify-end gap-2">
                     <button type="button" class="btn bg-gray-200" onclick="closeModal('uploadModal')">Tutup</button>
                     <button type="button" id="previewButton" class="btn btn-primary">
