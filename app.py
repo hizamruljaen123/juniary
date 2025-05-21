@@ -889,7 +889,7 @@ def train_model():
         fig.set_size_inches(width, height)
         
         # Save to root directory for direct access via URL
-        plt.savefig("sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
+        plt.savefig("/static/sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
         plt.close()
 
         # Save a copy to static folder for compatibility
