@@ -376,6 +376,62 @@ class DatabaseManager:
         except Error as e:
             print(f"Error getting rules: {e}")
             return None
+    def get_data_split_summary(self):
+        """
+        Ambil ringkasan pembagian data (total, latih, uji)
+        """
+        try:
+            total_data = 0
+            train_data = 0
+            test_data = 0
+
+            # Get total data count
+            query_total = "SELECT COUNT(*) as total FROM texts"
+            cursor = self.execute_query(query_total)
+            if cursor:
+                result = cursor.fetchone()
+                if result and 'total' in result:
+                    total_data = result['total'] if result['total'] is not None else 0
+                cursor.close()
+            else:
+                # Query execution failed
+                print("Failed to execute query for total data count in get_data_split_summary.")
+                return None
+
+            # Get train data count
+            query_train = "SELECT COUNT(*) as count FROM dataset_splits WHERE split_type = 'train'"
+            cursor = self.execute_query(query_train)
+            if cursor:
+                result = cursor.fetchone()
+                if result and 'count' in result:
+                    train_data = result['count'] if result['count'] is not None else 0
+                cursor.close()
+            else:
+                print("Failed to execute query for train data count in get_data_split_summary.")
+                return None
+
+            # Get test data count
+            query_test = "SELECT COUNT(*) as count FROM dataset_splits WHERE split_type = 'test'"
+            cursor = self.execute_query(query_test)
+            if cursor:
+                result = cursor.fetchone()
+                if result and 'count' in result:
+                    test_data = result['count'] if result['count'] is not None else 0
+                cursor.close()
+            else:
+                print("Failed to execute query for test data count in get_data_split_summary.")
+                return None
+            
+            return {
+                'total_data': total_data,
+                'train_data': train_data,
+                'test_data': test_data
+            }
+            
+        except Error as e:
+            print(f"Error getting data split summary: {e}")
+            return None
+            
     def clear_dataset_splits(self):
         """
         Hapus semua pembagian dataset (train/test)

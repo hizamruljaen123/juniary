@@ -511,7 +511,7 @@ def analyze_data():
         else:
             return jsonify({
                 'error': 'No data available for analysis'
-            }), 400
+            }, 400)
             
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -937,41 +937,59 @@ def get_data_distribution():
         # Check if user is logged in
         if not session.get('logged_in'):
             return jsonify({'error': 'Unauthorized access'}), 401
+        
         total_data = 0
         train_size = 0
         test_size = 0
+        db_processed_successfully = False
         
-        # Try to get data from database first
         db_manager = DatabaseManager()
         if db_manager.connect():
-            # Get total data count
-            total_data = db_manager.get_data_count()
-            
-            # Get test data count
-            test_data = db_manager.get_dataset_split_counts()
-            if test_data and 'test' in test_data:
-                test_size = test_data['test']
-                train_size = total_data - test_size
-            else:
-                # No explicit split, assume all is training data
-                train_size = total_data
-            
-            db_manager.disconnect()
-        else:
-            # Fallback to CSV if database connection fails
+            summary = db_manager.get_data_split_summary()
+            db_manager.disconnect() # Disconnect after use
+
+            if summary:
+                total_data = summary['total_data']
+                train_size = summary['train_data']
+                test_size = summary['test_data']
+                
+                # If dataset_splits table is empty (or doesn't reflect splits) 
+                # but texts table has data, consider all data as 'train' for this view's purpose
+                # if no explicit split is defined.
+                if total_data > 0 and train_size == 0 and test_size == 0:
+                    train_size = total_data 
+                    test_size = 0
+                
+                # Ensure consistency, though counts should be correct from summary
+                if train_size + test_size > total_data and test_size > 0 : # If test data exists, adjust train
+                    train_size = total_data - test_size
+                    if train_size < 0: train_size = 0 # Ensure non-negative
+                elif train_size + test_size > total_data and train_size > 0: # If train data exists, adjust test (less likely scenario)
+                    test_size = total_data - train_size
+                    if test_size < 0: test_size = 0 # Ensure non-negative
+
+
+                db_processed_successfully = True
+        
+        if not db_processed_successfully:
+            # Fallback to CSV if database connection failed or summary was None
             if os.path.exists('static/data/labeled_data.csv'):
                 df_all = pd.read_csv('static/data/labeled_data.csv')
                 total_data = len(df_all)
                 
-                # Check if test data exists
                 if os.path.exists('static/data/test_data.csv'):
                     df_test = pd.read_csv('static/data/test_data.csv')
                     test_size = len(df_test)
+                    # Ensure train_size is calculated correctly and non-negative
                     train_size = total_data - test_size
-            else:
-                # If no explicit test data, use 80/20 split for visualization
-                train_size = int(total_data * 0.8)
-                test_size = total_data - train_size
+                    if train_size < 0:
+                        train_size = 0 # Avoid negative train_size if test_data is larger than labeled_data
+                        total_data = test_size # Adjust total_data if test_data is the only source of truth for size
+                else:
+                    # If test_data.csv does not exist, assume all labeled_data is for training
+                    train_size = total_data
+                    test_size = 0
+            # If labeled_data.csv also doesn't exist, total_data, train_size, test_size remain 0.
         
         return jsonify({
             'total_data': total_data,
@@ -981,6 +999,7 @@ def get_data_distribution():
             'test_percent': round((test_size / total_data * 100) if total_data > 0 else 0, 1)
         })
     except Exception as e:
+        print(f"Error in /api/data-distribution: {e}") # Log the exception server-side
         return jsonify({'error': str(e)}), 400
 
 @app.route('/api/test-data-distribution', methods=['GET'])
@@ -1304,5 +1323,83 @@ def process_dataset():
     # Return the streaming response
     return Response(stream_with_context(generate()), content_type='application/json')
 
+@app.route('/api/preview-file-split', methods=['POST'])
+def preview_file_split():
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        split_percentage_str = data.get('split_percentage')
+
+        if not filename or split_percentage_str is None:
+            return jsonify({"error": "Missing filename or split_percentage"}), 400
+
+        try:
+            split_percentage = float(split_percentage_str)
+            if not (0 <= split_percentage <= 100):
+                raise ValueError("Split percentage must be between 0 and 100.")
+        except ValueError as e:
+            return jsonify({"error": f"Invalid split_percentage: {str(e)}"}), 400
+
+        # Construct the full path to the file within the 'static/data/' directory
+        # Ensure app.static_folder is correctly configured if not using the default 'static'
+        file_path = os.path.join(app.static_folder, 'data', filename)
+
+        if not os.path.exists(file_path):
+            # Try to construct path relative to app.root_path if static_folder is not directly applicable
+            # This is a fallback, ensure your file serving strategy is consistent
+            current_dir_path = os.path.join(app.root_path, 'static', 'data', filename)
+            if not os.path.exists(current_dir_path):
+                 return jsonify({"error": f"File not found: {filename}. Checked: {file_path} and {current_dir_path}"}), 404
+            file_path = current_dir_path
+
+
+        try:
+            df = pd.read_csv(file_path, on_bad_lines='skip')
+        except pd.errors.EmptyDataError:
+            # For an empty file, return 0 rows but reflect the requested split percentages
+            return jsonify({
+                "total_rows": 0,
+                "train_rows": 0,
+                "test_rows": 0,
+                "train_percent": split_percentage,
+                "test_percent": 100 - split_percentage,
+                "message": "The file is empty or not a valid CSV."
+            }), 200
+        except Exception as e:
+            return jsonify({"error": f"Error reading CSV file: {str(e)}"}), 500
+        
+        total_rows = len(df)
+        
+        if total_rows == 0:
+            # If CSV has headers but no data rows
+            return jsonify({
+                "total_rows": 0,
+                "train_rows": 0,
+                "test_rows": 0,
+                "train_percent": split_percentage, # Reflect requested split
+                "test_percent": 100 - split_percentage, # Reflect requested split
+                "message": "The file contains no data rows (it might only have headers)."
+            }), 200
+
+        train_rows = int(round(total_rows * (split_percentage / 100.0)))
+        test_rows = total_rows - train_rows
+        
+        # Calculate actual percentages based on potentially rounded row counts
+        actual_train_percent = (train_rows / total_rows) * 100 if total_rows > 0 else 0
+        actual_test_percent = (test_rows / total_rows) * 100 if total_rows > 0 else 0
+
+        return jsonify({
+            "total_rows": total_rows,
+            "train_rows": train_rows,
+            "test_rows": test_rows,
+            "train_percent": actual_train_percent,
+            "test_percent": actual_test_percent
+        })
+
+    except Exception as e:
+        # Log the exception e for server-side debugging
+        app.logger.error(f"Unexpected error in /api/preview-file-split: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred on the server.", "details": str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000) # Ensure app.run is correctly configured

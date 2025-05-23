@@ -117,6 +117,7 @@
             font-size: 0.875rem;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap; /* Prevent cell text wrapping */
         }
 
         .btn {
@@ -559,10 +560,12 @@
                 <h3 class="text-md font-medium text-gray-800 mb-2">Pembagian Data</h3>
                 <label for="splitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih</label>
                 <div class="flex items-center gap-4">
-                    <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'">
+                    <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'; updateSplitPreviewChart(this.value);">
                     <span id="splitValueLabel" class="font-semibold text-blue-700">80%</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Pilih persentase data latih (sisanya untuk data uji)</p>
+                <!-- Div untuk preview chart -->
+                <div id="splitPreviewChart" style="width:100%; height:300px; margin-top: 1rem;"></div>
             </div>
             
             <!-- Advanced Parameters -->
@@ -692,6 +695,9 @@
         // Modal functions
         function openModal(modalId) {
             document.getElementById(modalId).style.display = 'block';
+            if (modalId === 'dataDistributionModal') {
+                resetDataDistributionModalView();
+            }
         }
 
         function closeModal(modalId) {
@@ -753,72 +759,306 @@
         }
 
         // Function to load data distribution chart
+        let currentDataDistributionTotal = 0; // Stores total data for the dataDistributionModal
+        let actualTrainSize = 0;
+        let actualTestSize = 0;
+
+        function resetDataDistributionModalView() {
+            // Show initial view, hide results view
+            $('#dataDistributionInitialView').removeClass('hidden');
+            $('#dataDistributionResultsView').addClass('hidden');
+
+            // Reset placeholders and hide actual chart/table containers within results view
+            $('#dataSplitChartContainer').addClass('hidden');
+            $('#dataSplitDetailTableContainer').addClass('hidden');
+            $('#dataSplitChartPlaceholder').removeClass('hidden').text('Klik "Preview Distribusi" untuk melihat chart.');
+            $('#dataSplitTablePlaceholder').removeClass('hidden').text('Klik "Preview Distribusi" untuk melihat detail tabel.');
+            
+            // Reset slider to default and update label (optional, or keep last user setting)
+            const slider = document.getElementById('dataDistSplitSlider');
+            if (slider) {
+                // slider.value = 80; // Or keep its current value if preferred
+                const label = document.getElementById('dataDistSplitValueLabel');
+                if (label) label.textContent = slider.value + '%';
+            }
+            // Clear previous table content
+            $('#dataSplitDetailTable tbody').empty();
+            // Ensure preview button is enabled
+            $('#previewDataDistributionButton').prop('disabled', false).html('<i class="fas fa-eye mr-1"></i> Preview Distribusi');
+        }
+
+        function populateDataSplitDetailTable(splitPercentage, totalData) {
+            const tableBody = $('#dataSplitDetailTable tbody');
+            tableBody.empty(); // Clear previous rows
+
+            if (totalData === 0 && actualTrainSize === 0 && actualTestSize === 0) { // Check if actual data was also zero
+                 tableBody.append(`
+                    <tr><td colspan="3" class="text-center py-3">Tidak ada data untuk ditampilkan.</td></tr>
+                `);
+                return;
+            }
+            
+            const trainPercent = parseFloat(splitPercentage);
+            const testPercent = 100 - trainPercent;
+
+            let trainCount, testCount;
+
+            if (totalData > 0) {
+                trainCount = Math.round(totalData * (trainPercent / 100));
+                testCount = totalData - trainCount;
+            } else { // If totalData from initial load was 0, but slider is moved.
+                trainCount = 0;
+                testCount = 0;
+            }
+
+
+            tableBody.append(`
+                <tr>
+                    <td class="py-2 px-3">Total Data Keseluruhan</td>
+                    <td class="py-2 px-3 text-center">100%</td>
+                    <td class="py-2 px-3 text-center">${totalData}</td>
+                </tr>
+                <tr>
+                    <td class="py-2 px-3">Data Latih (sesuai slider)</td>
+                    <td class="py-2 px-3 text-center">${trainPercent.toFixed(1)}%</td>
+                    <td class="py-2 px-3 text-center">${trainCount}</td>
+                </tr>
+                <tr>
+                    <td class="py-2 px-3">Data Uji (sesuai slider)</td>
+                    <td class="py-2 px-3 text-center">${testPercent.toFixed(1)}%</td>
+                    <td class="py-2 px-3 text-center">${testCount}</td>
+                </tr>
+            `);
+        }
+
+
         function loadDataDistribution() {
-            if (document.getElementById('dataSplitChart')) {
-                $.ajax({
-                    url: '/api/data-distribution',
-                    method: 'GET',
-                    success: function(response) {
-                        const data = [{
-                            labels: ['Data Latih', 'Data Uji'],
-                            values: [response.train_size, response.test_size],
-                            type: 'pie',
-                            marker: {
-                                colors: ['#3b82f6', '#10b981']
-                            },
-                            textinfo: 'label+percent',
-                            hole: 0.4,
-                            textposition: 'inside',
-                            insidetextfont: {
-                                color: 'white',
-                                size: 14
-                            }
-                        }];
-                        
-                        const layout = {
-                            title: 'Proporsi Data Latih & Uji',
-                            showlegend: false,
-                            annotations: [
-                                {
-                                    text: 'Total: ' + response.total_data,
-                                    showarrow: false,
-                                    font: {
-                                        size: 16
-                                    }
-                                }
-                            ]
-                        };
-                        
-                        Plotly.newPlot('dataSplitChart', data, layout);
+            const previewButton = $('#previewDataDistributionButton');
+            previewButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Memuat...');
+
+            // Hide initial view, show results view and set placeholders to loading
+            $('#dataDistributionInitialView').addClass('hidden');
+            $('#dataDistributionResultsView').removeClass('hidden');
+            
+            $('#dataSplitChartPlaceholder').removeClass('hidden').text('Memuat distribusi data aktual...');
+            $('#dataSplitTablePlaceholder').removeClass('hidden').text('Memuat data untuk tabel...');
+            $('#dataSplitChartContainer').addClass('hidden'); // Ensure chart is hidden until data loads
+            $('#dataSplitDetailTableContainer').addClass('hidden'); // Ensure table is hidden until data loads
+            
+            $.ajax({
+                url: '/api/data-distribution',
+                method: 'GET',
+                success: function(response) {
+                    currentDataDistributionTotal = response.total_data || 0;
+                    actualTrainSize = response.train_size || 0;
+                    actualTestSize = response.test_size || 0;
+
+                    // Show chart & table containers, hide placeholders
+                    $('#dataSplitChartPlaceholder').addClass('hidden');
+                    $('#dataSplitChartContainer').removeClass('hidden');
+                    $('#dataSplitTablePlaceholder').addClass('hidden');
+                    $('#dataSplitDetailTableContainer').removeClass('hidden');
+
+                    const pieData = [{
+                        labels: ['Data Latih Aktual', 'Data Uji Aktual'],
+                        values: [actualTrainSize, actualTestSize],
+                        type: 'pie',
+                        marker: { colors: ['#3b82f6', '#10b981'] },
+                        textinfo: 'label+percent+value',
+                        hole: 0.4,
+                        textposition: 'inside',
+                        insidetextfont: { color: 'white', size: 14 }
+                    }];
+                    const pieLayout = {
+                        title: 'Distribusi Data Aktual Tersimpan',
+                        showlegend: true,
+                        height: 350,
+                        margin: { t: 50, b: 20, l: 20, r: 20 },
+                        annotations: (currentDataDistributionTotal > 0 ? [{
+                            text: 'Total: ' + currentDataDistributionTotal,
+                            showarrow: false,
+                            font: { size: 16 },
+                            x: 0.5, y: 0.5,
+                            xanchor: 'center', yanchor: 'middle'
+                        }] : [])
+                    };
+                    Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
+
+                    const slider = document.getElementById('dataDistSplitSlider');
+                    const label = document.getElementById('dataDistSplitValueLabel');
+                    
+                    if (currentDataDistributionTotal > 0) {
+                        const actualTrainPercent = Math.round((actualTrainSize / currentDataDistributionTotal) * 100);
+                        slider.value = actualTrainPercent;
+                        if (label) label.textContent = actualTrainPercent + '%';
+                        populateDataSplitDetailTable(slider.value, currentDataDistributionTotal);
+                    } else {
+                        if (label) label.textContent = slider.value + '%'; // Keep slider value as is or default
+                        populateDataSplitDetailTable(slider.value, 0); // Show table with 0 total
+                        $('#dataSplitChartPlaceholder').removeClass('hidden').text('Tidak ada data aktual untuk ditampilkan pada chart.');
+                        $('#dataSplitChartContainer').addClass('hidden');
+                        // Table placeholder will be handled by populateDataSplitDetailTable if total is 0
+                    }
+                },
+                error: function() {
+                    $('#dataSplitChartPlaceholder').removeClass('hidden').text('Gagal memuat distribusi data.');
+                    $('#dataSplitTablePlaceholder').removeClass('hidden').text('Gagal memuat detail tabel.');
+                    $('#dataSplitChartContainer').addClass('hidden');
+                    $('#dataSplitDetailTableContainer').addClass('hidden');
+                    currentDataDistributionTotal = 0;
+                    actualTrainSize = 0;
+                    actualTestSize = 0;
+                    // Still show the results view with error messages
+                    $('#dataDistributionResultsView').removeClass('hidden');
+                    $('#dataDistributionInitialView').addClass('hidden'); // Keep initial view hidden
+                     populateDataSplitDetailTable($('#dataDistSplitSlider').val(), 0); // Show empty table
+                },
+                complete: function() {
+                    // Do not re-enable the button here, it's part of initialView which is now hidden.
+                    // User closes modal to go back. Or we add a "back" button.
+                    // For now, to allow re-preview, we might need to show initial view again on error,
+                    // or rely on modal close and reopen.
+                    // Let's re-enable and show initial view if there was an error to allow another attempt.
+                    if ($('#dataSplitChartPlaceholder').text().startsWith('Gagal')) {
+                         $('#previewDataDistributionButton').prop('disabled', false).html('<i class="fas fa-eye mr-1"></i> Preview Distribusi');
+                         $('#dataDistributionInitialView').removeClass('hidden');
+                         $('#dataDistributionResultsView').addClass('hidden');
+                    }
+                }
+            });
+        }
+        
+        // Add event listener for the data distribution slider
+        $(document).ready(function() {
+            $('#previewDataDistributionButton').click(loadDataDistribution);
+
+            const dataDistSlider = document.getElementById('dataDistSplitSlider');
+            const dataDistLabel = document.getElementById('dataDistSplitValueLabel');
+            if (dataDistSlider && dataDistLabel) {
+                dataDistSlider.addEventListener('input', function() {
+                    dataDistLabel.textContent = this.value + '%';
+                    // Only update table if results view is visible (meaning data has been loaded once)
+                    if (!$('#dataDistributionResultsView').hasClass('hidden')) {
+                        populateDataSplitDetailTable(this.value, currentDataDistributionTotal);
                     }
                 });
             }
+        });
+
+        function displaySplitDatasetPreview(filename, tableContainerId, titleId, countId) {
+            const tableContainer = $(`#${tableContainerId}`);
+            const titleElement = $(`#${titleId}`);
+            const countElement = $(`#${countId}`);
+            
+            tableContainer.html('<p class="text-center text-gray-500 py-4">Memuat data...</p>');
+            titleElement.text(`Preview Data ${filename === 'train_data.csv' ? 'Latih' : 'Uji'}`);
+
+
+            $.ajax({
+                url: `/api/preview-split-dataset?filename=${filename}`,
+                method: 'GET',
+                success: function(response) {
+                    if (response.error) {
+                        tableContainer.html(`<p class="text-center text-red-500 py-4">Error: ${response.error}</p>`);
+                        countElement.text(`(0 dari 0 baris)`);
+                        return;
+                    }
+
+                    if (response.data && response.data.length > 0) {
+                        let tableHTML = '<div class="custom-table-container max-h-96 overflow-y-auto"><table class="custom-table"><thead><tr>';
+                        response.columns.forEach(col => {
+                            tableHTML += `<th>${col}</th>`;
+                        });
+                        tableHTML += '</tr></thead><tbody>';
+                        response.data.forEach(row => {
+                            tableHTML += '<tr>';
+                            response.columns.forEach(col => {
+                                tableHTML += `<td>${row[col] !== null && row[col] !== undefined ? row[col] : ''}</td>`;
+                            });
+                            tableHTML += '</tr>';
+                        });
+                        tableHTML += '</tbody></table></div>';
+                        tableContainer.html(tableHTML);
+                        countElement.text(`(Menampilkan ${response.displayed_rows} dari ${response.total_rows} baris)`);
+                    } else {
+                        tableContainer.html('<p class="text-center text-gray-500 py-4">Tidak ada data untuk ditampilkan.</p>');
+                        countElement.text(`(0 dari ${response.total_rows} baris)`);
+                    }
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Gagal memuat data.';
+                    tableContainer.html(`<p class="text-center text-red-500 py-4">Error: ${errorMsg}</p>`);
+                    countElement.text(`(Gagal memuat)`);
+                }
+            });
         }
 
-        // Modify the openModal function to load data when needed
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
-            
-            if (modalId === 'dataDistributionModal') {
-                loadDataDistribution();
-            }
-        }        // Enhance the training result display
-        // This is now handled in train.js
     </script>
 
     <!-- Data Distribution Modal -->
     <div id="dataDistributionModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content max-w-2xl" style="overflow: auto; max-height: 90vh;"> <!-- Added overflow and max-height -->
             <h2 class="text-xl font-bold mb-4">Distribusi Data Latih & Uji</h2>
-            <div id="dataSplitChart" style="width:100%; height:400px;"></div>
+            
+            <div id="dataDistributionInitialView"> <!-- Wrapper for initial controls -->
+                <div class="mb-4">
+                    <label for="dataDistSplitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih (untuk Preview)</label>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="dataDistSplitSlider" name="dataDistSplitSlider" min="50" max="95" value="80" step="1" class="w-full">
+                        <span id="dataDistSplitValueLabel" class="font-semibold text-blue-700">80%</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Geser slider untuk menentukan persentase, lalu klik "Preview Distribusi".</p>
+                </div>
+
+                <div class="mb-6 text-center">
+                    <button type="button" id="previewDataDistributionButton" class="btn btn-primary">
+                        <i class="fas fa-eye mr-1"></i> Preview Distribusi
+                    </button>
+                </div>
+            </div>
+
+            <div id="dataDistributionResultsView" class="hidden"> <!-- Wrapper for results, initially hidden -->
+                <div class="mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-2">Distribusi Data Aktual Tersimpan</h3>
+                    <div id="dataSplitChartContainer" class="hidden"> 
+                        <div id="dataSplitChart" style="width:100%; height:350px;"></div>
+                    </div>
+                    <p id="dataSplitChartPlaceholder" class="text-center text-gray-500 py-4">Klik "Preview Distribusi" untuk melihat chart.</p>
+                </div>
+                
+                <hr class="my-6">
+
+                <div class="mt-4 mb-6">
+                    <h3 class="text-md font-medium text-gray-800 mb-2">Tabel Detail Pembagian Data (Sesuai Slider Preview)</h3>
+                    <div id="dataSplitDetailTableContainer" class="hidden"> 
+                        <div class="custom-table-container">
+                            <table class="custom-table" id="dataSplitDetailTable">
+                                <thead>
+                                    <tr>
+                                        <th class="py-2 px-3">Jenis Data</th>
+                                        <th class="py-2 px-3 text-center">Persentase</th> <!-- Centered -->
+                                        <th class="py-2 px-3 text-center">Jumlah Data</th> <!-- Centered -->
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Rows will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p id="dataSplitTablePlaceholder" class="text-center text-gray-500 py-4">Klik "Preview Distribusi" untuk melihat detail tabel.</p>
+                </div>
+            </div>
+            
             <div class="flex justify-end mt-4">
                 <button type="button" class="btn bg-gray-200" onclick="closeModal('dataDistributionModal')">Tutup</button>
             </div>
-        </div>    </div>
+        </div>
+    </div>
     
     <!-- Training Logs Modal -->
     <div id="trainingLogsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg w-3/4 max-h-[80vh] overflow-hidden">
+        <div class="bg-white rounded-lg w-3/4 max-h-[90vh] overflow-hidden flex flex-col"> {/* Increased max-h and added flex */}
             <div class="p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold">Detail Log Pelatihan Model</h2>
@@ -826,11 +1066,31 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div class="overflow-y-auto max-h-[60vh] p-4 bg-gray-50 rounded-lg">
+            </div>
+            <div class="overflow-y-auto flex-grow p-6 pt-0"> {/* Added flex-grow for this container */}
+                <div class="p-4 bg-gray-50 rounded-lg max-h-[30vh] overflow-y-auto mb-6"> {/* Log content with max-height -->
+                    <h3 class="text-md font-semibold mb-2 text-gray-700">Log Proses:</h3>
                     <div id="trainingLogsContent" class="text-sm"></div>
                 </div>
-                <div class="mt-4 flex justify-end">                <button type="button" class="btn bg-gray-200" onclick="document.getElementById('trainingLogsModal').classList.add('hidden'); location.reload();">Tutup</button>
+
+                <!-- Train Data Preview -->
+                <div class="mb-6">
+                    <h3 id="trainDataPreviewTitle" class="text-md font-semibold mb-2 text-gray-700">Preview Data Latih <span id="trainDataCount" class="text-xs font-normal"></span></h3>
+                    <div id="trainDataPreviewContainer">
+                        {/* Table will be injected here by JavaScript */}
+                    </div>
                 </div>
+
+                <!-- Test Data Preview -->
+                <div>
+                    <h3 id="testDataPreviewTitle" class="text-md font-semibold mb-2 text-gray-700">Preview Data Uji <span id="testDataCount" class="text-xs font-normal"></span></h3>
+                    <div id="testDataPreviewContainer">
+                        {/* Table will be injected here by JavaScript */}
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end">
+                <button type="button" class="btn bg-gray-200" onclick="document.getElementById('trainingLogsModal').classList.add('hidden'); location.reload();">Tutup</button>
             </div>
         </div>
     </div>

@@ -1,6 +1,6 @@
 <!-- Preview and Labeling Modal -->
 <div id="previewModal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-content" style="max-width: 900px; overflow: auto; max-height: 85vh;">
         <h2 class="text-xl font-bold mb-4">Preview dan Pelabelan Dataset</h2>
         
         <div class="mb-4">
@@ -18,6 +18,22 @@
                 <li>location: Lokasi (opsional)</li>
                 <li>username: Username (opsional)</li>
             </ul>
+        </div>
+
+        <!-- Data Split Preview Section -->
+        <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+            <h3 class="text-lg font-medium text-gray-800 mb-3">Preview Pembagian Data untuk Training</h3>
+            <div class="mb-3">
+                <label for="previewSplitSlider" class="block text-sm font-medium text-gray-700">Persentase Data Training: <span id="previewSplitValueLabel" class="font-bold">70</span>%</label>
+                <input type="range" id="previewSplitSlider" min="50" max="95" value="70" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+            </div>
+            <button id="previewSplitButton" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-sm py-2 px-3">
+                <i class="fas fa-search-plus mr-1"></i> Preview Pembagian
+            </button>
+            <div id="previewSplitResult" class="mt-3 text-sm text-gray-700 p-3 bg-white rounded-md border hidden">
+                <!-- Results will be displayed here -->
+                <p>Memproses...</p>
+            </div>
         </div>
         
         <!-- Preview Section -->
@@ -64,3 +80,143 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const previewSplitSlider = document.getElementById('previewSplitSlider');
+        const previewSplitValueLabel = document.getElementById('previewSplitValueLabel');
+        const previewSplitButton = document.getElementById('previewSplitButton');
+        const previewSplitResult = document.getElementById('previewSplitResult');
+
+        if (previewSplitSlider && previewSplitValueLabel) {
+            // Initialize with current slider value
+            previewSplitValueLabel.textContent = previewSplitSlider.value; 
+            previewSplitSlider.addEventListener('input', function () {
+                previewSplitValueLabel.textContent = this.value;
+            });
+        }
+
+        if (previewSplitButton) {
+            previewSplitButton.addEventListener('click', function() {
+                const splitPercentage = previewSplitSlider ? parseInt(previewSplitSlider.value) : 70;
+                // Attempt to get filename from an element, fallback to 'temp_upload.csv'
+                // This 'uploadedFileName' element is not in the provided HTML for preview_modal.html,
+                // so 'temp_upload.csv' will likely be used. This is consistent with expectations.
+                const filenameElement = document.getElementById('uploadedFileName'); 
+                let filename = 'temp_upload.csv'; 
+
+                if (filenameElement && filenameElement.textContent && filenameElement.textContent.trim() !== '') {
+                    filename = filenameElement.textContent.trim();
+                }
+
+                previewSplitResult.innerHTML = '<p>Memproses...</p>';
+                previewSplitResult.classList.remove('hidden');
+                // Reset result styles
+                previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-yellow-50', 'text-yellow-700', 'border-yellow-400', 'bg-white');
+                previewSplitResult.classList.add('bg-white', 'border');
+
+
+                fetch('/api/preview-file-split', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filename: filename,
+                        split_percentage: splitPercentage
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { 
+                            let errorMsg = 'Terjadi kesalahan.';
+                            if (err && err.error) errorMsg = err.error;
+                            else errorMsg = 'HTTP error! Status: ' + response.status;
+                            
+                            // Construct a new error object that includes potential data from err
+                            const customError = new Error(errorMsg);
+                            customError.data = err; // Attach full error response
+                            throw customError;
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        let errorHtml = '<p class="font-semibold">Error:</p><p>' + data.error + '</p>';
+                        if (data.message) {
+                            errorHtml += '<p class="text-sm text-gray-600 mt-1">' + data.message + '</p>';
+                        }
+                        
+                        let details = '';
+                        const requestedSplit = previewSplitSlider ? parseInt(previewSplitSlider.value) : 70;
+
+                        if (data.total_rows !== undefined) details += '<li>Total Baris: ' + data.total_rows + '</li>';
+                        
+                        if (data.train_rows !== undefined) details += '<li>Data Training (hasil): ' + data.train_rows + ' baris</li>';
+                        else details += '<li>Data Training (hasil): - </li>';
+
+                        if (data.test_rows !== undefined) details += '<li>Data Testing (hasil): ' + data.test_rows + ' baris</li>';
+                        else details += '<li>Data Testing (hasil): - </li>';
+                        
+                        details += '<li>Persentase Training (diminta): ' + requestedSplit + '%</li>';
+
+                        if (data.train_percent !== undefined) {
+                             details += '<li>Persentase Training (aktual): ' + parseFloat(data.train_percent).toFixed(2) + '%</li>';
+                        }
+                        if (data.test_percent !== undefined) {
+                             details += '<li>Persentase Testing (aktual): ' + parseFloat(data.test_percent).toFixed(2) + '%</li>';
+                        }
+
+                        if (details) {
+                             errorHtml += '<ul class="list-disc list-inside mt-1 text-sm">' + details + '</ul>';
+                        }
+                        previewSplitResult.innerHTML = errorHtml;
+                        previewSplitResult.classList.remove('bg-yellow-50', 'text-yellow-700', 'border-yellow-400', 'bg-white');
+                        previewSplitResult.classList.add('bg-red-50', 'text-red-700', 'border-red-400');
+                    } else { // Success
+                        previewSplitResult.innerHTML =
+                            '<p class="font-semibold mb-1">Hasil Pembagian Data:</p>' +
+                            '<ul class="list-disc list-inside text-sm">' +
+                            '    <li>Total Baris Data: ' + data.total_rows + '</li>' +
+                            '    <li>Data Training (' + parseFloat(data.train_percent).toFixed(2) + '%): ' + data.train_rows + ' baris</li>' +
+                            '    <li>Data Testing (' + parseFloat(data.test_percent).toFixed(2) + '%): ' + data.test_rows + ' baris</li>' +
+                            '</ul>';
+                        if (data.message) {
+                            previewSplitResult.innerHTML += '<p class="text-sm mt-2 p-2 bg-yellow-50 border border-yellow-400 rounded text-yellow-700">' + data.message + '</p>';
+                            previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-white');
+                            previewSplitResult.classList.add('bg-yellow-50', 'text-yellow-700', 'border-yellow-400');
+                        } else {
+                           previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-yellow-50', 'text-yellow-700', 'border-yellow-400');
+                           previewSplitResult.classList.add('bg-white');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching split preview:', error);
+                    let errorHtml = '<p class="font-semibold">Error:</p><p>' + (error.message || 'Gagal mendapatkan preview pembagian data.') + '</p>';
+                    // If error.data exists (from the custom error in .then(response => ...)), display its contents
+                    if (error.data) {
+                        if (error.data.message) {
+                             errorHtml += '<p class="text-sm text-gray-600 mt-1">' + error.data.message + '</p>';
+                        }
+                        let details = '';
+                        const requestedSplit = previewSplitSlider ? parseInt(previewSplitSlider.value) : 70;
+                        if (error.data.total_rows !== undefined) details += '<li>Total Baris: ' + error.data.total_rows + '</li>';
+                        if (error.data.train_rows !== undefined) details += '<li>Data Training (hasil): ' + error.data.train_rows + ' baris</li>';
+                        if (error.data.test_rows !== undefined) details += '<li>Data Testing (hasil): ' + error.data.test_rows + ' baris</li>';
+                        details += '<li>Persentase Training (diminta): ' + requestedSplit + '%</li>';
+                        if (error.data.train_percent !== undefined) details += '<li>Persentase Training (aktual): ' + parseFloat(error.data.train_percent).toFixed(2) + '%</li>';
+                        if (error.data.test_percent !== undefined) details += '<li>Persentase Testing (aktual): ' + parseFloat(error.data.test_percent).toFixed(2) + '%</li>';
+                        if (details) {
+                             errorHtml += '<ul class="list-disc list-inside mt-1 text-sm">' + details + '</ul>';
+                        }
+                    }
+                    previewSplitResult.innerHTML = errorHtml;
+                    previewSplitResult.classList.remove('bg-yellow-50', 'text-yellow-700', 'border-yellow-400', 'bg-white');
+                    previewSplitResult.classList.add('bg-red-50', 'text-red-700', 'border-red-400');
+                });
+            });
+        }
+    });
+</script>
