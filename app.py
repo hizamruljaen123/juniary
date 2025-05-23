@@ -647,18 +647,14 @@ def train_model():
 
                 training_logs.append(f"Membagi dataset: {len(df_train)} data latih, {len(df_test)} data uji")
 
-                # Save split information to database
-                training_logs.append("Menyimpan informasi split data ke database...")
+                # Save split information to database                training_logs.append("Menyimpan informasi split data ke database...")
                 
-                # Clear previous split information
-                db_manager.clear_dataset_splits()
+                # Collect train and test IDs
+                train_ids = df_train['id'].tolist()
+                test_ids = df_test['id'].tolist()
                 
                 # Save train/test splits
-                for _, row in df_train.iterrows():
-                    db_manager.save_dataset_split(text_id=row['id'], split_type='train')
-                    
-                for _, row in df_test.iterrows():
-                    db_manager.save_dataset_split(text_id=row['id'], split_type='test')
+                db_manager.save_dataset_split(train_ids, test_ids)
                 
                 # Also save to CSV for backward compatibility
                 df_test.to_csv('static/data/test_data.csv', index=False)
@@ -887,9 +883,8 @@ def train_model():
         height = max(10, depth * 3)
         fig = plt.gcf()
         fig.set_size_inches(width, height)
-        
-        # Save to root directory for direct access via URL
-        plt.savefig("/static/sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
+          # Save to static directory for direct access via URL
+        plt.savefig("static/sentiment_rules_tree.svg", format="svg", bbox_inches="tight")
         plt.close()
 
         # Save a copy to static folder for compatibility
