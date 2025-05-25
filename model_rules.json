@@ -1,78 +1,42 @@
 {
     "confidence_rules": {
-        "very_high": {"threshold": 0.9, "label": "Sangat Tinggi"},
-        "high": {"threshold": 0.7, "label": "Tinggi"},
-        "medium": {"threshold": 0.5, "label": "Sedang"},
-        "low": {"threshold": 0.0, "label": "Rendah"}
-    },
-    "sentiment_classification": {
-        "positive": {
-            "very_positive": {"confidence_threshold": 0.8, "label": "Sangat Positif"},
-            "moderate_positive": {"confidence_threshold": 0.5, "label": "Cukup Positif"}
+        "positive_very_high": {
+            "threshold": 0.8,
+            "count": 32,
+            "label": "Very High Positive"
         },
-        "neutral": {
-            "strong_neutral": {"confidence_threshold": 0.7, "label": "Netral Kuat"},
-            "weak_neutral": {"confidence_threshold": 0.0, "label": "Netral Lemah"}
+        "neutral_very_high": {
+            "threshold": 0.9,
+            "count": 87,
+            "label": "Very High Neutral"
         },
-        "negative": {
-            "very_negative": {"confidence_threshold": 0.8, "label": "Sangat Negatif"},
-            "moderate_negative": {"confidence_threshold": 0.5, "label": "Cukup Negatif"}
+        "positive_medium": {
+            "threshold": 0.5,
+            "count": 15,
+            "label": "Medium Positive"
+        },
+        "negative_very_high": {
+            "threshold": 0.9,
+            "count": 36,
+            "label": "Very High Negative"
+        },
+        "positive_high": {
+            "threshold": 0.6,
+            "count": 19,
+            "label": "High Positive"
+        },
+        "neutral_high": {
+            "threshold": 0.6,
+            "count": 13,
+            "label": "High Neutral"
+        },
+        "neutral_medium": {
+            "threshold": 0.5,
+            "count": 12,
+            "label": "Medium Neutral"
         }
     },
-    "popularity_rules": {
-        "viral": {
-            "threshold": 1000,
-            "categories": {
-                "positive": "Viral Positif",
-                "negative": "Viral Negatif"
-            }
-        },
-        "popular": {
-            "min_threshold": 100,
-            "max_threshold": 999,
-            "label": "Populer"
-        },
-        "normal": {
-            "threshold": 99,
-            "label": "Normal"
-        }
-    },
-    "impact_rules": {
-        "high_positive": {
-            "conditions": {
-                "category": "Sangat Positif",
-                "popularity": "Viral Positif"
-            },
-            "label": "Dampak Positif Tinggi"
-        },
-        "high_negative": {
-            "conditions": {
-                "category": "Sangat Negatif",
-                "popularity": "Viral Negatif"
-            },
-            "label": "Dampak Negatif Tinggi"
-        },
-        "moderate": {
-            "conditions": {
-                "categories": ["Cukup Positif", "Netral Kuat"],
-                "popularity": "Populer"
-            },
-            "label": "Dampak Moderat"
-        },
-        "limited": {
-            "conditions": {
-                "popularity": "Normal"
-            },
-            "label": "Dampak Terbatas"
-        }
-    },
-    "preprocessing_rules": {
-        "url": {"pattern": "https?://\\S+|www\\.\\S+", "action": "remove"},
-        "mention": {"pattern": "@\\w+", "action": "remove"},
-        "hashtag": {"pattern": "#", "action": "remove"},
-        "punctuation": {"pattern": "[^\\w\\s]", "action": "replace", "replacement": " "},
-        "whitespace": {"pattern": "\\s+", "action": "replace", "replacement": " "},
-        "case": {"action": "lowercase"},
-        "emoji": {"action": "remove"}
-    }
+    "sentiment_classification": {},
+    "popularity_rules": {},
+    "impact_rules": {}
 }

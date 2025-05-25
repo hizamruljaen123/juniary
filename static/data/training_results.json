@@ -1,0 +1,86 @@
+{
+  "success": true,
+  "eval_result": {
+    "confusion_matrix": [
+      [
+        6,
+        5,
+        16
+      ],
+      [
+        2,
+        35,
+        19
+      ],
+      [
+        7,
+        14,
+        217
+      ]
+    ],
+    "labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "classification_report": {
+      "negative": {
+        "precision": 0.4,
+        "recall": 0.2222222222222222,
+        "f1-score": 0.2857142857142857,
+        "support": 27.0
+      },
+      "neutral": {
+        "precision": 0.6481481481481481,
+        "recall": 0.625,
+        "f1-score": 0.6363636363636364,
+        "support": 56.0
+      },
+      "positive": {
+        "precision": 0.8611111111111112,
+        "recall": 0.9117647058823529,
+        "f1-score": 0.8857142857142858,
+        "support": 238.0
+      },
+      "accuracy": 0.8037383177570093,
+      "macro avg": {
+        "precision": 0.6364197530864198,
+        "recall": 0.5863289760348583,
+        "f1-score": 0.6025974025974027,
+        "support": 321.0
+      },
+      "weighted avg": {
+        "precision": 0.7851736471674168,
+        "recall": 0.8037383177570093,
+        "f1-score": 0.7917465711858236,
+        "support": 321.0
+      }
+    }
+  },
+  "accuracy": 0.8037383177570093,
+  "training_logs": [
+    "Memulai proses pelatihan model...",
+    "Parameter diterima: split data 80% latih, 20% uji",
+    "Memuat dataset dari database...",
+    "Dataset dimuat: 1602 data",
+    "Mengacak dataset untuk memastikan distribusi yang merata...",
+    "Membagi dataset: 1281 data latih, 321 data uji",
+    "Data split berhasil disimpan",
+    "Mulai tahap pra-pemrosesan teks...",
+    "Menghapus stopwords dari teks...",
+    "Melakukan vektorisasi dengan metode count, max features: 5000...",
+    "Jumlah fitur setelah vektorisasi: 5000",
+    "Parameter Decision Tree: max_depth=none, criterion=gini, min_samples_split=2, min_samples_leaf=1",
+    "Mulai pelatihan model decision tree...",
+    "Pelatihan model selesai",
+    "Evaluasi model pada data uji: akurasi = 0.8037 (80.37%)",
+    "Menyimpan model ke database...",
+    "Model berhasil disimpan ke database",
+    "Membuat struktur pohon keputusan C5.0...",
+    "Struktur pohon keputusan berhasil dibuat",
+    "Aturan keputusan disimpan dalam format teks",
+    "Membuat visualisasi pohon keputusan...",
+    "Proses pelatihan selesai!",
+    "Akurasi model: 80.37%"
+  ]
+}

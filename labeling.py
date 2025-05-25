@@ -67,14 +67,16 @@ def analyze_text_batch(analyzer, texts, favorite_counts=None, max_workers=4):
     
     return results
 
-def stream_process_dataset(analyzer, input_df, progress_callback):
+def stream_process_dataset(analyzer, input_df, progress_callback, save_to_db=True):
     """
     Process the dataset and apply sentiment analysis to each row.
+    Optionally save to database during processing.
     
     Args:
         analyzer: The SentimentAnalyzer instance
         input_df: The input DataFrame to process
         progress_callback: Callback function to report progress
+        save_to_db: Whether to save to database during processing
         
     Returns:
         Processed DataFrame with sentiment analysis results
@@ -84,6 +86,10 @@ def stream_process_dataset(analyzer, input_df, progress_callback):
     
     # Initialize output data
     labeled_data = []
+    saved_to_db_count = 0
+    
+    # Check if database is available
+    use_database = save_to_db and hasattr(analyzer, 'db_manager') and analyzer.db_manager.connection
     
     # Report start
     progress_callback(0, "Memulai proses analisis sentiment...")
@@ -101,7 +107,7 @@ def stream_process_dataset(analyzer, input_df, progress_callback):
             favorite_counts = batch_df['favorite_count'].fillna(0).tolist()
         
         # Process batch in parallel
-        progress_callback(int(i/total_rows*100), f"Menganalisis batch {i//batch_size + 1}/{(total_rows+batch_size-1)//batch_size}...")
+        progress_callback(int(i/total_rows*80), f"Menganalisis batch {i//batch_size + 1}/{(total_rows+batch_size-1)//batch_size}...")
         batch_results = analyze_text_batch(analyzer, texts, favorite_counts)
         
         # Process each row in the batch
@@ -110,7 +116,7 @@ def stream_process_dataset(analyzer, input_df, progress_callback):
             result = batch_results[idx]
             
             if result is None or 'error' in result:
-                progress_callback(int(i/total_rows*100), f"Melewati baris {j+1}: Teks kosong atau error", "error")
+                progress_callback(int(i/total_rows*80), f"Melewati baris {j+1}: Teks kosong atau error", "error")
                 continue
             
             # Create entry with default values
@@ -119,28 +125,56 @@ def stream_process_dataset(analyzer, input_df, progress_callback):
                 'preprocessed_text': result['text'],
                 'sentiment': result['sentiment'],
                 'confidence': result['confidence'],
-                'favorite_count': 0,
-                'created_at': '',
-                'location': '',
-                'username': '',
+                'favorite_count': int(row.get('favorite_count', 0)) if pd.notna(row.get('favorite_count', 0)) else 0,
+                'created_at': row.get('created_at') if pd.notna(row.get('created_at')) else None,
+                'location': row.get('location') if pd.notna(row.get('location')) else None,
+                'username': row.get('username') if pd.notna(row.get('username')) else None,
                 'source_dataset': 'uploaded_data'
             }
             
             # Add optional fields if available
             for field in ['favorite_count', 'created_at', 'location', 'username']:
                 if field in row and not pd.isna(row[field]):
-                    entry[field] = row[field]
+                    if field == 'favorite_count':
+                        entry[field] = int(row[field]) if row[field] != '' else 0
+                    else:
+                        entry[field] = row[field]
+            
+            # Save to database immediately if available
+            if use_database:
+                try:
+                    success = analyzer.db_manager.save_sentiment_data(
+                        text=entry['text'],
+                        preprocessed_text=entry['preprocessed_text'],
+                        sentiment=entry['sentiment'],
+                        confidence=entry['confidence'],
+                        favorite_count=entry['favorite_count'],
+                        created_at=entry['created_at'],
+                        location=entry['location'],
+                        username=entry['username'],
+                        source_dataset=entry['source_dataset']
+                    )
+                    if success:
+                        saved_to_db_count += 1
+                except Exception as e:
+                    progress_callback(int(i/total_rows*80), f"Error saving to database: {str(e)}", "error")
             
             labeled_data.append(entry)
             
             # Report individual progress occasionally
             if (j - i) % 10 == 0 or j == i + batch_size - 1:
-                progress_callback(int((i + j - i + 1)/total_rows*100), f"Diproses: {j+1}/{total_rows} baris")
+                if use_database:
+                    progress_callback(int((i + j - i + 1)/total_rows*80), f"Diproses: {j+1}/{total_rows} baris, tersimpan ke DB: {saved_to_db_count}")
+                else:
+                    progress_callback(int((i + j - i + 1)/total_rows*80), f"Diproses: {j+1}/{total_rows} baris")
     
     # Convert to DataFrame
     df_labeled = pd.DataFrame(labeled_data)
     
     # Report completion
-    progress_callback(100, f"Analisis selesai! Total {len(df_labeled)} baris berhasil dilabeli.", "success")
+    if use_database:
+        progress_callback(100, f"Analisis selesai! Total {len(df_labeled)} baris berhasil dilabeli, {saved_to_db_count} tersimpan ke database.", "success")
+    else:
+        progress_callback(100, f"Analisis selesai! Total {len(df_labeled)} baris berhasil dilabeli.", "success")
     
     return df_labeled
