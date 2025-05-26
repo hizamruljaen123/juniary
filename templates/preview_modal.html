@@ -144,13 +144,14 @@
                 .then(data => {
                     if (data.error) {
                         let errorHtml = '<p class="font-semibold">Error:</p><p>' + data.error + '</p>';
-                        if (data.message) {
-                            errorHtml += '<p class="text-sm text-gray-600 mt-1">' + data.message + '</p>';
+                        if (data.message) { // If a specific message is provided by the API
+                            errorHtml += '<p class="text-xs mt-1">' + data.message + '</p>';
                         }
-                        
-                        let details = '';
+                        // Add details about the split if available, even in error cases
+                        let details = '<ul class="list-disc ml-5 mt-2 text-xs">';
                         const requestedSplit = previewSplitSlider ? parseInt(previewSplitSlider.value) : 70;
 
+                        details += '<li>Permintaan Split: ' + requestedSplit + '% Training</li>';
                         if (data.total_rows !== undefined) details += '<li>Total Baris: ' + data.total_rows + '</li>';
                         
                         if (data.train_rows !== undefined) details += '<li>Data Training (hasil): ' + data.train_rows + ' baris</li>';
@@ -159,57 +160,35 @@
                         if (data.test_rows !== undefined) details += '<li>Data Testing (hasil): ' + data.test_rows + ' baris</li>';
                         else details += '<li>Data Testing (hasil): - </li>';
                         
-                        details += '<li>Persentase Training (diminta): ' + requestedSplit + '%</li>';
+                        details += '</ul>';
+                        errorHtml += details;
 
-                        if (data.train_percent !== undefined) {
-                             details += '<li>Persentase Training (aktual): ' + parseFloat(data.train_percent).toFixed(2) + '%</li>';
-                        }
-                        if (data.test_percent !== undefined) {
-                             details += '<li>Persentase Testing (aktual): ' + parseFloat(data.test_percent).toFixed(2) + '%</li>';
-                        }
-
-                        if (details) {
-                             errorHtml += '<ul class="list-disc list-inside mt-1 text-sm">' + details + '</ul>';
-                        }
                         previewSplitResult.innerHTML = errorHtml;
                         previewSplitResult.classList.remove('bg-yellow-50', 'text-yellow-700', 'border-yellow-400', 'bg-white');
                         previewSplitResult.classList.add('bg-red-50', 'text-red-700', 'border-red-400');
                     } else { // Success
-                        previewSplitResult.innerHTML =
-                            '<p class="font-semibold mb-1">Hasil Pembagian Data:</p>' +
-                            '<ul class="list-disc list-inside text-sm">' +
-                            '    <li>Total Baris Data: ' + data.total_rows + '</li>' +
-                            '    <li>Data Training (' + parseFloat(data.train_percent).toFixed(2) + '%): ' + data.train_rows + ' baris</li>' +
-                            '    <li>Data Testing (' + parseFloat(data.test_percent).toFixed(2) + '%): ' + data.test_rows + ' baris</li>' +
-                            '</ul>';
-                        if (data.message) {
-                            previewSplitResult.innerHTML += '<p class="text-sm mt-2 p-2 bg-yellow-50 border border-yellow-400 rounded text-yellow-700">' + data.message + '</p>';
-                            previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-white');
-                            previewSplitResult.classList.add('bg-yellow-50', 'text-yellow-700', 'border-yellow-400');
-                        } else {
-                           previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-yellow-50', 'text-yellow-700', 'border-yellow-400');
-                           previewSplitResult.classList.add('bg-white');
+                        let successHtml = '<p class="font-semibold text-green-700">Preview Pembagian Data Berhasil:</p>';
+                        successHtml += '<ul class="list-disc ml-5 mt-2 text-xs">';
+                        successHtml += '<li>Total Baris: ' + (data.total_rows !== undefined ? data.total_rows : '-') + '</li>';
+                        successHtml += '<li>Data Training: ' + (data.train_rows !== undefined ? data.train_rows : '-') + ' baris (' + (data.train_percentage !== undefined ? data.train_percentage.toFixed(1) : '-') + '%)</li>';
+                        successHtml += '<li>Data Testing: ' + (data.test_rows !== undefined ? data.test_rows : '-') + ' baris (' + (data.test_percentage !== undefined ? data.test_percentage.toFixed(1) : '-') + '%)</li>';
+                        successHtml += '</ul>';
+                        if(data.message) {
+                            successHtml += '<p class="mt-2 text-xs italic">' + data.message + '</p>';
                         }
+                        previewSplitResult.innerHTML = successHtml;
+                        previewSplitResult.classList.remove('bg-red-50', 'text-red-700', 'border-red-400', 'bg-yellow-50', 'text-yellow-700', 'border-yellow-400', 'bg-white');
+                        previewSplitResult.classList.add('bg-green-50', 'text-green-700', 'border-green-400'); // Success styling
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching split preview:', error);
                     let errorHtml = '<p class="font-semibold">Error:</p><p>' + (error.message || 'Gagal mendapatkan preview pembagian data.') + '</p>';
                     // If error.data exists (from the custom error in .then(response => ...)), display its contents
-                    if (error.data) {
+                    if (error.data && error.data.error) { // Check if error.data and error.data.error exist
+                        errorHtml += '<p class="text-xs mt-1">Detail: ' + error.data.error + '</p>';
                         if (error.data.message) {
-                             errorHtml += '<p class="text-sm text-gray-600 mt-1">' + error.data.message + '</p>';
-                        }
-                        let details = '';
-                        const requestedSplit = previewSplitSlider ? parseInt(previewSplitSlider.value) : 70;
-                        if (error.data.total_rows !== undefined) details += '<li>Total Baris: ' + error.data.total_rows + '</li>';
-                        if (error.data.train_rows !== undefined) details += '<li>Data Training (hasil): ' + error.data.train_rows + ' baris</li>';
-                        if (error.data.test_rows !== undefined) details += '<li>Data Testing (hasil): ' + error.data.test_rows + ' baris</li>';
-                        details += '<li>Persentase Training (diminta): ' + requestedSplit + '%</li>';
-                        if (error.data.train_percent !== undefined) details += '<li>Persentase Training (aktual): ' + parseFloat(error.data.train_percent).toFixed(2) + '%</li>';
-                        if (error.data.test_percent !== undefined) details += '<li>Persentase Testing (aktual): ' + parseFloat(error.data.test_percent).toFixed(2) + '%</li>';
-                        if (details) {
-                             errorHtml += '<ul class="list-disc list-inside mt-1 text-sm">' + details + '</ul>';
+                            errorHtml += '<p class="text-xs mt-1">' + error.data.message + '</p>';
                         }
                     }
                     previewSplitResult.innerHTML = errorHtml;

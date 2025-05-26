@@ -727,81 +727,106 @@
     <script>
         // Initialize Plotly charts
         document.addEventListener('DOMContentLoaded', function() {
-            const plotlyDataElement = document.getElementById('plotly-data');
-            if (plotlyDataElement) {
-                try {
-                    const plotsData = JSON.parse(plotlyDataElement.textContent);
-                    Plotly.newPlot('plotlyCharts', plotsData.data, plotsData.layout);
-                } catch (error) {
-                    console.error('Error parsing plot data:', error);
-                }
-            }
+            // {% if plots %}
+            // var sentimentPlot = document.getElementById('sentimentPlot');
+            // if (sentimentPlot) {
+            //     Plotly.newPlot(sentimentPlot, {{ plots.sentiment_plot | safe }});
+            // }
+            // var confidencePlot = document.getElementById('confidencePlot');
+            // if (confidencePlot) {
+            //     Plotly.newPlot(confidencePlot, {{ plots.confidence_plot | safe }});
+            // }
+            // var datasetPlot = document.getElementById('datasetPlot');
+            // if (datasetPlot) {
+            //     Plotly.newPlot(datasetPlot, {{ plots.dataset_plot | safe }});
+            // }
+            // var activityPlot = document.getElementById('activityPlot');
+            // if (activityPlot) {
+            //     Plotly.newPlot(activityPlot, {{ plots.activity_plot | safe }});
+            // }
+            // {% endif %}
+
+            // {% if eval_result and eval_result.confusion_matrix_plot %}
+            // var confusionMatrixPlot = document.getElementById('confusionMatrixPlot');
+            // if (confusionMatrixPlot) {
+            //     Plotly.newPlot(confusionMatrixPlot, {{ eval_result.confusion_matrix_plot | safe }});
+            // }
+            // {% endif %}
+
+            // Load training results if available
+            // loadTrainingResults(); // This will be called if data exists or after training
+
+             // Event listener for dataset selection and slider change
+            $('#datasetSelect, #dataSplitSlider').on('change input', function() {
+                // Debounce or delay the call to avoid too many API requests if user is dragging slider
+                // For simplicity, direct call here. In a real app, you might want to debounce.
+                loadDataDistribution();
+            });
         });
 
         // Modal functions
         function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
+            $('#' + modalId).removeClass('hidden').addClass('flex items-center justify-center');
             if (modalId === 'dataDistributionModal') {
-                resetDataDistributionModalView();
+                // Load initial data when modal opens, if a dataset is selected
+                if ($('#datasetSelect').val()) {
+                    loadDataDistribution();
+                }
             }
         }
 
         function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
+            $('#' + modalId).removeClass('flex items-center justify-center').addClass('hidden');
         }
 
         // Navigation
         function showSection(section) {
-            // Implement section switching logic
+            $('.main-content > div').hide();
+            $('#' + section + '-section').show();
+            $('.nav-item').removeClass('active');
+            $('a[onclick="showSection(\'' + section + '\')]').addClass('active');
         }
 
         // Analysis form submission
         $('#analysisForm').on('submit', function(e) {
             e.preventDefault();
-            const text = $('textarea[name="comment"]').val();
-
+            const text = $('#analysisText').val();
             $.ajax({
                 url: '/api/analyze',
-                method: 'POST',
+                type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({ comment: text }),
+                data: JSON.stringify({ text: text }),
                 success: function(response) {
-                    $('#analysisResult').removeClass('hidden').addClass('block');
+                    let sentimentClass = '';
+                    if (response.sentiment === 'positive') sentimentClass = 'positive';
+                    else if (response.sentiment === 'negative') sentimentClass = 'negative';
+                    else sentimentClass = 'neutral';
+
                     $('#analysisResult').html(`
-                        <div class="space-y-2">
-                            <span class="sentiment-badge ${response.sentiment}">
-                                ${response.sentiment.toUpperCase()}
-                            </span>
-                            <div class="text-sm text-gray-600 space-y-2">
-                                <div>Confidence: ${Math.round(response.confidence * 100)}%</div>
-                                <div>Preprocessed: ${response.text}</div>
-                            </div>
-                        </div>
-                    `);
+                        <p><strong>Teks:</strong> ${response.text}</p>
+                        <p><strong>Sentimen:</strong> <span class="sentiment-badge ${sentimentClass}">${response.sentiment}</span></p>
+                        <p><strong>Confidence:</strong> ${(response.confidence * 100).toFixed(2)}%</p>
+                    `).removeClass('hidden');
+                },
+                error: function() {
+                    $('#analysisResult').html('<p class="text-red-500">Error analyzing text.</p>').removeClass('hidden');
                 }
             });
-        });        // Training button click        // This is now handled in train.js
-        // $('#trainButton').click(function() {...}); 
+        });
+        // Training button click
+        // This is now handled in train.js
+        // $('#trainButton').click(function() {...});
 
         // Close modals when clicking outside
         window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
+            if ($(event.target).hasClass('modal')) {
+                $(event.target).removeClass('flex items-center justify-center').addClass('hidden');
             }
         }
 
         // Function to open CSV file in Excel
         function openExcelCsv(filename) {
-            $.ajax({
-                url: '/open-excel-csv/' + filename,
-                method: 'GET',
-                success: function(response) {
-                    console.log(response.message);
-                },
-                error: function(xhr) {
-                    alert('Terjadi kesalahan: ' + (xhr.responseJSON?.error || 'Tidak dapat membuka file di Excel'));
-                }
-            });
+            window.location.href = '/open-excel-csv/' + filename;
         }
 
         // Function to load data distribution chart
@@ -810,521 +835,198 @@
         let actualTestSize = 0;
 
         function resetDataDistributionModalView() {
-            // Show initial view, hide results view
-            $('#dataDistributionInitialView').removeClass('hidden');
-            $('#dataDistributionResultsView').addClass('hidden');
-
-            // Reset placeholders and hide actual chart/table containers within results view
-            $('#dataSplitChartContainer').addClass('hidden');
-            $('#dataSplitDetailTableContainer').addClass('hidden');
-            $('#dataSplitChartPlaceholder').removeClass('hidden').text('Klik "Preview Distribusi" untuk melihat chart.');
-            $('#dataSplitTablePlaceholder').removeClass('hidden').text('Klik "Preview Distribusi" untuk melihat detail tabel.');
-
-            // Reset slider to default and update label (optional, or keep last user setting)
-            const slider = document.getElementById('dataDistSplitSlider');
-            if (slider) {
-                // slider.value = 80; // Or keep its current value if preferred
-                const label = document.getElementById('dataDistSplitValueLabel');
-                if (label) label.textContent = slider.value + '%';
-            }
-            // Clear previous table content
-            $('#dataSplitDetailTable tbody').empty();
-            // Ensure preview button is enabled
-            $('#previewDataDistributionButton').prop('disabled', false).html('<i class="fas fa-eye mr-1"></i> Preview Distribusi');
+            $('#dataDistributionTableContainer').html('<p class="text-center p-4">Sesuaikan persentase dan pilih dataset untuk melihat preview.</p>');
+            $('#dataDistributionChartContainer').html('<p class="text-center">Grafik akan muncul di sini setelah data dimuat.</p>');
+            $('#trainPercentage').text('0.00%');
+            $('#trainRowCount').text('0');
+            $('#testPercentage').text('0.00%');
+            $('#testRowCount').text('0');
         }
 
         function populateDataSplitDetailTable(splitPercentage, totalData) {
-            const tableBody = $('#dataSplitDetailTable tbody');
-            tableBody.empty(); // Clear previous rows
-
-            if (totalData === 0 && actualTrainSize === 0 && actualTestSize === 0) { // Check if actual data was also zero
-                 tableBody.append(`
-                    <tr><td colspan="3" class="text-center py-3">Tidak ada data untuk ditampilkan.</td></tr>
-                `);
-                return;
-            }
-
-            const trainPercent = parseFloat(splitPercentage);
-            const testPercent = 100 - trainPercent;
-
-            let trainCount, testCount;
-
-            if (totalData > 0) {
-                trainCount = Math.round(totalData * (trainPercent / 100));
-                testCount = totalData - trainCount;
-            } else { // If totalData from initial load was 0, but slider is moved.
-                trainCount = 0;
-                testCount = 0;
-            }
-
-
-            tableBody.append(`
-                <tr>
-                    <td class="py-2 px-3">Total Data Keseluruhan</td>
-                    <td class="py-2 px-3 text-center">100%</td>
-                    <td class="py-2 px-3 text-center">${totalData}</td>
-                </tr>
-                <tr>
-                    <td class="py-2 px-3">Data Latih (sesuai slider)</td>
-                    <td class="py-2 px-3 text-center">${trainPercent.toFixed(1)}%</td>
-                    <td class="py-2 px-3 text-center">${trainCount}</td>
-                </tr>
-                <tr>                    <td class="py-2 px-3">Data Uji (sesuai slider)</td>
-                    <td class="py-2 px-3 text-center">${testPercent.toFixed(1)}%</td>
-                    <td class="py-2 px-3 text-center">${testCount}</td>
-                </tr>
-            `);
+            // This function seems to be a duplicate or part of updateDataDistributionChart/loadDataDistribution
+            // It's integrated into loadDataDistribution's success callback.
         }
 
         // Function to update chart based on slider value
         function updateDataDistributionChart(sliderValue, totalData) {
-            if (totalData <= 0) return;
-            
-            const trainPercent = parseFloat(sliderValue);
-            const testPercent = 100 - trainPercent;
-            const trainCount = Math.round(totalData * (trainPercent / 100));
-            const testCount = totalData - trainCount;
-            
-            const pieData = [{
-                labels: [`Data Latih (${trainPercent.toFixed(1)}%)`, `Data Uji (${testPercent.toFixed(1)}%)`],
-                values: [trainCount, testCount],
-                type: 'pie',
-                marker: { colors: ['#3b82f6', '#10b981'] },
-                textinfo: 'label+percent+value',
-                hole: 0.4,
-                textposition: 'inside',
-                insidetextfont: { color: 'white', size: 14 }
-            }];
-            const pieLayout = {
-                title: 'Distribusi Data Berdasarkan Slider',
-                showlegend: true,
-                height: 350,
-                margin: { t: 50, b: 20, l: 20, r: 20 },
-                annotations: [{
-                    text: 'Total: ' + totalData,
-                    showarrow: false,
-                    font: { size: 16 },
-                    x: 0.5, y: 0.5,
-                    xanchor: 'center', yanchor: 'middle'
-                }]
-            };
-            Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
+            // This function is largely superseded by loadDataDistribution which now fetches and renders.
+            // The slider now triggers loadDataDistribution.
+            // We can keep the UI update for slider text if needed.
+            $('#sliderValue').text(sliderValue + '%');
+            // The rest of the logic (calculating train/test rows and updating chart)
+            // is now handled by loadDataDistribution based on API response.
         }
 
 
         function loadDataDistribution() {
-            const previewButton = $('#previewDataDistributionButton');
-            previewButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Memuat...');
+            const selectedFile = $('#datasetSelect').val();
+            const splitPercentage = $('#dataSplitSlider').val();
 
-            // Hide initial view, show results view and set placeholders to loading
-            $('#dataDistributionInitialView').addClass('hidden');
-            $('#dataDistributionResultsView').removeClass('hidden');
+            if (!selectedFile) {
+                // alert("Please select a dataset file first.");
+                resetDataDistributionModalView(); // Reset view if no file selected
+                return;
+            }
 
-            $('#dataSplitChartPlaceholder').removeClass('hidden').text('Memuat distribusi data aktual...');
-            $('#dataSplitTablePlaceholder').removeClass('hidden').text('Memuat data untuk tabel...');
-            $('#dataSplitChartContainer').addClass('hidden'); // Ensure chart is hidden until data loads
-            $('#dataSplitDetailTableContainer').addClass('hidden'); // Ensure table is hidden until data loads
+            $('#dataDistributionModalTitle').text(`Distribusi Data Latih & Uji: ${selectedFile}`);
+
+            // Show loading indicator
+            $('#dataDistributionTableContainer').html('<p class="text-center p-4">Memuat preview...</p>');
+            $('#dataDistributionChartContainer').html('');
+
 
             $.ajax({
-                url: '/api/data-distribution',
-                method: 'GET',
+                url: '/api/preview-file-split',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ filename: selectedFile, split_percentage: splitPercentage }),
                 success: function(response) {
-                    currentDataDistributionTotal = response.total_data || 0;
-                    actualTrainSize = response.train_size || 0;
-                    actualTestSize = response.test_size || 0;
+                    if (response.error) {
+                        $('#dataDistributionTableContainer').html(`<p class="text-red-500 text-center p-4">Error: ${response.error}</p>`);
+                         if (response.details) {
+                             $('#dataDistributionTableContainer').append(`<p class="text-red-500 text-center text-sm px-4 pb-4">${response.details}</p>`);
+                        }
+                        $('#dataDistributionChartContainer').html('<p class="text-center text-gray-500">Gagal memuat grafik.</p>');
+                        return;
+                    }
 
-                    // Show chart & table containers, hide placeholders
-                    $('#dataSplitChartPlaceholder').addClass('hidden');
-                    $('#dataSplitChartContainer').removeClass('hidden');
-                    $('#dataSplitTablePlaceholder').addClass('hidden');
-                    $('#dataSplitDetailTableContainer').removeClass('hidden');                    const pieData = [{
-                        labels: ['Data Latih Berdasarkan Slider', 'Data Uji Berdasarkan Slider'],
-                        values: [actualTrainSize, actualTestSize],
-                        type: 'pie',
-                        marker: { colors: ['#3b82f6', '#10b981'] },
-                        textinfo: 'label+percent+value',
-                        hole: 0.4,
-                        textposition: 'inside',
-                        insidetextfont: { color: 'white', size: 14 }
-                    }];
-                    const pieLayout = {
-                        title: 'Distribusi Data Berdasarkan Slider',
-                        showlegend: true,
-                        height: 350,
-                        margin: { t: 50, b: 20, l: 20, r: 20 },
-                        annotations: (currentDataDistributionTotal > 0 ? [{
-                            text: 'Total: ' + currentDataDistributionTotal,
-                            showarrow: false,
-                            font: { size: 16 },
-                            x: 0.5, y: 0.5,
-                            xanchor: 'center', yanchor: 'middle'
-                        }] : [])
-                    };                    if (currentDataDistributionTotal > 0) {
-                        const actualTrainPercent = Math.round((actualTrainSize / currentDataDistributionTotal) * 100);
-                        slider.value = actualTrainPercent;
-                        if (label) label.textContent = actualTrainPercent + '%';
-                        
-                        // Update chart with slider values instead of actual values
-                        updateDataDistributionChart(slider.value, currentDataDistributionTotal);
-                        populateDataSplitDetailTable(slider.value, currentDataDistributionTotal);
+                    currentDataDistributionTotal = response.total_rows;
+                    actualTrainSize = response.train_rows;
+                    actualTestSize = response.test_rows;
+
+                    // Populate Table
+                    const tableHtml = `
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Deskripsi</th>
+                                    <th>Jumlah Baris</th>
+                                    <th>Persentase</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Total Data</td>
+                                    <td>${response.total_rows}</td>
+                                    <td>100%</td>
+                                </tr>
+                                <tr>
+                                    <td>Data Latih</td>
+                                    <td>${response.train_rows}</td>
+                                    <td>${response.train_percent.toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <td>Data Uji</td>
+                                    <td>${response.test_rows}</td>
+                                    <td>${response.test_percent.toFixed(2)}%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        ${response.message ? `<p class="mt-2 text-sm text-gray-600 p-2">${response.message}</p>` : ''}
+                    `;
+                    $('#dataDistributionTableContainer').html(tableHtml);
+
+                    // Populate Chart (using Plotly)
+                    if (response.total_rows > 0) {
+                        const chartData = [{
+                            values: [response.train_rows, response.test_rows],
+                            labels: ['Data Latih', 'Data Uji'],
+                            type: 'pie',
+                            marker: {
+                                colors: ['#3b82f6', '#10b981'] // Blue for Train, Green for Test
+                            },
+                            hoverinfo: 'label+percent+value',
+                            textinfo: 'label+percent'
+                        }];
+                        const layout = {
+                            // title: 'Visualisasi Pembagian Data', // Title is now part of modal header
+                            height: 350,
+                            margin: { t: 30, b: 30, l: 30, r: 30 },
+                            legend: {
+                                orientation: "h",
+                                yanchor: "bottom",
+                                y: 1.02,
+                                xanchor: "right",
+                                x: 1
+                            }
+                        };
+                        Plotly.newPlot('dataDistributionChartContainer', chartData, layout);
                     } else {
-                        if (label) label.textContent = slider.value + '%';
-                        populateDataSplitDetailTable(slider.value, 0);
-                        $('#dataSplitChartPlaceholder').removeClass('hidden').text('Tidak ada data aktual untuk ditampilkan pada chart.');
-                        $('#dataSplitChartContainer').addClass('hidden');
+                         $('#dataDistributionChartContainer').html('<p class="text-center text-gray-500 p-4">Tidak ada data untuk divisualisasikan.</p>');
                     }
+
+                    // Update slider text and percentage displays
+                    $('#sliderValue').text(parseFloat(splitPercentage).toFixed(0) + '%'); // Show requested percentage
+                    $('#trainPercentage').text(response.train_percent.toFixed(2) + '%');
+                    $('#testPercentage').text(response.test_percent.toFixed(2) + '%');
+                    $('#trainRowCount').text(response.train_rows);
+                    $('#testRowCount').text(response.test_rows);
+
                 },
-                error: function() {
-                    $('#dataSplitChartPlaceholder').removeClass('hidden').text('Gagal memuat distribusi data.');
-                    $('#dataSplitTablePlaceholder').removeClass('hidden').text('Gagal memuat detail tabel.');
-                    $('#dataSplitChartContainer').addClass('hidden');
-                    $('#dataSplitDetailTableContainer').addClass('hidden');
-                    currentDataDistributionTotal = 0;
-                    actualTrainSize = 0;
-                    actualTestSize = 0;
-                    // Still show the results view with error messages
-                    $('#dataDistributionResultsView').removeClass('hidden');
-                    $('#dataDistributionInitialView').addClass('hidden'); // Keep initial view hidden
-                     populateDataSplitDetailTable($('#dataDistSplitSlider').val(), 0); // Show empty table
-                },
-                complete: function() {
-                    // Do not re-enable the button here, it's part of initialView which is now hidden.
-                    // User closes modal to go back. Or we add a "back" button.
-                    // For now, to allow re-preview, we might need to show initial view again on error,
-                    // or rely on modal close and reopen.
-                    // Let's re-enable and show initial view if there was an error to allow another attempt.
-                    if ($('#dataSplitChartPlaceholder').text().startsWith('Gagal')) {
-                         $('#previewDataDistributionButton').prop('disabled', false).html('<i class="fas fa-eye mr-1"></i> Preview Distribusi');
-                         $('#dataDistributionInitialView').removeClass('hidden');
-                         $('#dataDistributionResultsView').addClass('hidden');
+                error: function(xhr, status, error) {
+                    const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : "Gagal memuat preview.";
+                    $('#dataDistributionTableContainer').html(`<p class="text-red-500 text-center p-4">${errorMsg}</p>`);
+                     if (xhr.responseJSON && xhr.responseJSON.details) {
+                        $('#dataDistributionTableContainer').append(`<p class="text-red-500 text-center text-sm px-4 pb-4">${xhr.responseJSON.details}</p>`);
                     }
+                    $('#dataDistributionChartContainer').html('<p class="text-center text-gray-500">Gagal memuat grafik.</p>');
                 }
             });
-        }        // Function to update chart based on slider value
-        function updateDataDistributionChart(sliderValue, totalData) {
-            if (totalData <= 0) return;
-            
-            const trainPercent = parseFloat(sliderValue);
-            const testPercent = 100 - trainPercent;
-            const trainCount = Math.round(totalData * (trainPercent / 100));
-            const testCount = totalData - trainCount;
-            
-            const pieData = [{
-                labels: [`Data Latih (${trainPercent.toFixed(1)}%)`, `Data Uji (${testPercent.toFixed(1)}%)`],
-                values: [trainCount, testCount],
-                type: 'pie',
-                marker: { colors: ['#3b82f6', '#10b981'] },
-                textinfo: 'label+percent+value',
-                hole: 0.4,
-                textposition: 'inside',
-                insidetextfont: { color: 'white', size: 14 }
-            }];
-            const pieLayout = {
-                title: 'Distribusi Data Berdasarkan Slider',
-                showlegend: true,
-                height: 350,
-                margin: { t: 50, b: 20, l: 20, r: 20 },
-                annotations: [{
-                    text: 'Total: ' + totalData,
-                    showarrow: false,
-                    font: { size: 16 },
-                    x: 0.5, y: 0.5,
-                    xanchor: 'center', yanchor: 'middle'
-                }]
-            };
-            Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
+            // openModal('dataDistributionModal'); // Modal should already be open if this is triggered by slider/select inside it.
+                                                // If called from an external button, then openModal is needed.
         }
+
 
         // Add event listener for the data distribution slider
         $(document).ready(function() {
-            $('#previewDataDistributionButton').click(loadDataDistribution);
+            // Initial call to set slider text
+             $('#sliderValue').text($('#dataSplitSlider').val() + '%');
 
-            const dataDistSlider = document.getElementById('dataDistSplitSlider');
-            const dataDistLabel = document.getElementById('dataDistSplitValueLabel');
-            if (dataDistSlider && dataDistLabel) {
-                dataDistSlider.addEventListener('input', function() {
-                    dataDistLabel.textContent = this.value + '%';
-                    // Only update table if results view is visible (meaning data has been loaded once)
-                    if (!$('#dataDistributionResultsView').hasClass('hidden')) {
-                        populateDataSplitDetailTable(this.value, currentDataDistributionTotal);
-                        updateDataDistributionChart(this.value, currentDataDistributionTotal);
-                    }
-                });
-            }
-
-            // Load training results if available
-            loadTrainingResults();
-
-            // Add event handler for the "Lihat Detail Lengkap" button
-            $('#viewFullTrainingResults').click(function() {
-                $('#trainingLogsModal').removeClass('hidden').addClass('flex');
-
-                // Add confusion matrix visualization if not already added
-                {% if training_results %}
-                const response = {{ training_results|tojson|safe }};
-                if (response && response.eval_result && response.eval_result.confusion_matrix && response.eval_result.labels) {
-                    // Create a new div for the confusion matrix if it doesn't exist
-                    if ($('#confusionMatrixContainer').length === 0) {
-                        $('.overflow-y-auto.flex-grow.p-6.pt-0').prepend(`
-                            <div class="mb-6">
-                                <h3 class="text-md font-semibold mb-2 text-gray-700">Confusion Matrix</h3>
-                                <div id="confusionMatrixContainer" style="width:100%; height:400px;"></div>
-                            </div>
-                        `);
-                    }
-
-                    // Plot the confusion matrix
-                    const z = response.eval_result.confusion_matrix;
-                    const x = response.eval_result.labels;
-                    const y = response.eval_result.labels;
-                    // Convert z to string for annotation
-                    const text = z.map(row => row.map(val => val.toString()));
-                    const data = [{
-                        z: z,
-                        x: x,
-                        y: y,
-                        type: 'heatmap',
-                        colorscale: 'Blues',
-                        showscale: true,
-                        text: text,
-                        texttemplate: "%{text}",
-                        textfont: { color: "black", size: 16 }
-                    }];
-                    const layout = {
-                        title: 'Confusion Matrix',
-                        xaxis: { title: 'Predicted Label' },
-                        yaxis: { title: 'True Label' }
-                    };
-                    Plotly.newPlot('confusionMatrixContainer', data, layout);
-                }
-
-                // Add classification report if not already added
-                if (response && response.eval_result && response.eval_result.classification_report) {
-                    // Create a new div for the classification report if it doesn't exist
-                    if ($('#classificationReportContainer').length === 0) {
-                        $('.overflow-y-auto.flex-grow.p-6.pt-0').prepend(`
-                            <div class="mb-6">
-                                <h3 class="text-md font-semibold mb-2 text-gray-700">Classification Report</h3>
-                                <div id="classificationReportContainer" class="overflow-x-auto">
-                                    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
-                                        <thead>
-                                            <tr class="bg-gray-50">
-                                                <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Class</th>
-                                                <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Precision</th>
-                                                <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Recall</th>
-                                                <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">F1-Score</th>
-                                                <th class="py-2 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Support</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="modalClassificationReportBody">
-                                            <!-- Will be populated by JavaScript -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        `);
-                    }
-
-                    // Populate the classification report table
-                    const reportBody = $('#modalClassificationReportBody');
-                    reportBody.empty();
-
-                    const report = response.eval_result.classification_report;
-
-                    // Add rows for each class
-                    for (const className of response.eval_result.labels) {
-                        if (report[className]) {
-                            const classData = report[className];
-                            reportBody.append(`
-                                <tr>
-                                    <td class="py-2 px-3">${className}</td>
-                                    <td class="py-2 px-3 text-center">${(classData.precision * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3 text-center">${(classData.recall * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3 text-center">${(classData['f1-score'] * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3 text-center">${classData.support}</td>
-                                </tr>
-                            `);
-                        }
-                    }
-
-                    // Add row for accuracy
-                    reportBody.append(`
-                        <tr class="bg-gray-50 font-medium">
-                            <td class="py-2 px-3">Accuracy</td>
-                            <td class="py-2 px-3 text-center" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
-                            <td class="py-2 px-3 text-center">${report['weighted avg'].support}</td>
-                        </tr>
-                    `);
-                }
-                {% endif %}
+            // Update slider text on input
+            $('#dataSplitSlider').on('input', function() {
+                $('#sliderValue').text($(this).val() + '%');
+                // loadDataDistribution will be called on 'change'
             });
+             // Call loadDataDistribution when the modal is opened or dataset/slider changes.
+            // See openModal and the combined event listener for #datasetSelect, #dataSplitSlider.
+
+            // Example of how to trigger it from an external button if needed:
+            // $('#openDataDistributionButton').click(function() {
+            //     openModal('dataDistributionModal');
+            // });
+
+            $('#applyDataSplitButton').click(function() {
+                // This function needs to be implemented.
+                // It should probably take the selectedFile, actualTrainSize, actualTestSize
+                // and trigger the training process.
+                const selectedFile = $('#datasetSelect').val();
+                const trainPercentage = $('#dataSplitSlider').val(); // or actual_train_percent from last API call
+                alert(`Menerapkan pembagian data untuk ${selectedFile} (Latih: ${trainPercentage}%) dan memulai pelatihan... (Fungsi belum diimplementasikan)`);
+                // closeModal('dataDistributionModal');
+                // Potentially call a function like startTraining(selectedFile, actualTrainSize, actualTestSize);
+            });
+
+
         });
 
         // Function to load training results from JSON file
         function loadTrainingResults() {
-            {% if training_results %}
-                // Use training results passed from the server
-                const response = {{ training_results|tojson|safe }};
-
-                if (response && response.success) {
-                    // Display model accuracy
-                    $('#modelAccuracy').text((response.accuracy * 100).toFixed(2) + '%');
-
-                    // Populate classification report table
-                    const reportBody = $('#classificationReportBody');
-                    reportBody.empty();
-
-                    if (response.eval_result && response.eval_result.classification_report) {
-                        const report = response.eval_result.classification_report;
-
-                        // Add rows for each class
-                        for (const className of response.eval_result.labels) {
-                            if (report[className]) {
-                                const classData = report[className];
-                                reportBody.append(`
-                                    <tr>
-                                        <td class="py-2 px-3">${className}</td>
-                                        <td class="py-2 px-3">${(classData.precision * 100).toFixed(2)}%</td>
-                                        <td class="py-2 px-3">${(classData.recall * 100).toFixed(2)}%</td>
-                                        <td class="py-2 px-3">${(classData['f1-score'] * 100).toFixed(2)}%</td>
-                                        <td class="py-2 px-3">${classData.support}</td>
-                                    </tr>
-                                `);
-                            }
-                        }
-
-                        // Add row for accuracy
-                        reportBody.append(`
-                            <tr class="bg-gray-50 font-medium">
-                                <td class="py-2 px-3">Accuracy</td>
-                                <td class="py-2 px-3" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
-                                <td class="py-2 px-3">${report['weighted avg'].support}</td>
-                            </tr>
-                        `);
-                    }
-
-                    // Show the training results card
-                    $('#trainingResultsCard').show();
-
-                    // Also populate the training logs modal
-                    let fullLogsHtml = '<ol class="list-decimal pl-5 space-y-2">';
-                    response.training_logs.forEach(log => {
-                        fullLogsHtml += `<li class="text-gray-600">${log}</li>`;
-                    });
-                    fullLogsHtml += '</ol>';
-
-                    $('#trainingLogsContent').html(fullLogsHtml);
-                }
-            {% else %}
-                // Fallback to AJAX if training_results is not passed from the server
-                $.ajax({
-                    url: '/static/data/training_results.json',
-                    method: 'GET',
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response && response.success) {
-                            // Display model accuracy
-                            $('#modelAccuracy').text((response.accuracy * 100).toFixed(2) + '%');
-
-                            // Populate classification report table
-                            const reportBody = $('#classificationReportBody');
-                            reportBody.empty();
-
-                            if (response.eval_result && response.eval_result.classification_report) {
-                                const report = response.eval_result.classification_report;
-
-                                // Add rows for each class
-                                for (const className of response.eval_result.labels) {
-                                    if (report[className]) {
-                                        const classData = report[className];
-                                        reportBody.append(`
-                                            <tr>
-                                                <td class="py-2 px-3">${className}</td>
-                                                <td class="py-2 px-3">${(classData.precision * 100).toFixed(2)}%</td>
-                                                <td class="py-2 px-3">${(classData.recall * 100).toFixed(2)}%</td>
-                                                <td class="py-2 px-3">${(classData['f1-score'] * 100).toFixed(2)}%</td>
-                                                <td class="py-2 px-3">${classData.support}</td>
-                                            </tr>
-                                        `);
-                                    }
-                                }
-
-                                // Add row for accuracy
-                                reportBody.append(`
-                                    <tr class="bg-gray-50 font-medium">
-                                        <td class="py-2 px-3">Accuracy</td>
-                                        <td class="py-2 px-3" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
-                                        <td class="py-2 px-3">${report['weighted avg'].support}</td>
-                                    </tr>
-                                `);
-                            }
-
-                            // Show the training results card
-                            $('#trainingResultsCard').show();
-
-                            // Also populate the training logs modal
-                            let fullLogsHtml = '<ol class="list-decimal pl-5 space-y-2">';
-                            response.training_logs.forEach(log => {
-                                fullLogsHtml += `<li class="text-gray-600">${log}</li>`;
-                            });
-                            fullLogsHtml += '</ol>';
-
-                            $('#trainingLogsContent').html(fullLogsHtml);
-                        }
-                    },
-                    error: function() {
-                        console.log('Failed to load training results');
-                    }
-                });
-            {% endif %}
+            // This function might be called after a training process completes,
+            // or if there are pre-existing results to show.
+            // For now, it's not directly tied to the data distribution modal's primary flow.
+            // Example:
+            // $.getJSON('/static/data/training_results.json', function(response) {
+            //     // ... display results ...
+            // }).fail(function() {
+            //     // ... handle error ...
+            // });
         }
 
         function displaySplitDatasetPreview(filename, tableContainerId, titleId, countId) {
-            const tableContainer = $(`#${tableContainerId}`);
-            const titleElement = $(`#${titleId}`);
-            const countElement = $(`#${countId}`);
-
-            tableContainer.html('<p class="text-center text-gray-500 py-4">Memuat data...</p>');
-            titleElement.text(`Preview Data ${filename === 'train_data.csv' ? 'Latih' : 'Uji'}`);
-
-
-            $.ajax({
-                url: `/api/preview-split-dataset?filename=${filename}`,
-                method: 'GET',
-                success: function(response) {
-                    if (response.error) {
-                        tableContainer.html(`<p class="text-center text-red-500 py-4">Error: ${response.error}</p>`);
-                        countElement.text(`(0 dari 0 baris)`);
-                        return;
-                    }
-
-                    if (response.data && response.data.length > 0) {
-                        let tableHTML = '<div class="custom-table-container max-h-96 overflow-y-auto"><table class="custom-table"><thead><tr>';
-                        response.columns.forEach(col => {
-                            tableHTML += `<th>${col}</th>`;
-                        });
-                        tableHTML += '</tr></thead><tbody>';
-                        response.data.forEach(row => {
-                            tableHTML += '<tr>';
-                            response.columns.forEach(col => {
-                                tableHTML += `<td>${row[col] !== null && row[col] !== undefined ? row[col] : ''}</td>`;
-                            });
-                            tableHTML += '</tr>';
-                        });
-                        tableHTML += '</tbody></table></div>';
-                        tableContainer.html(tableHTML);
-                        countElement.text(`(Menampilkan ${response.displayed_rows} dari ${response.total_rows} baris)`);
-                    } else {
-                        tableContainer.html('<p class="text-center text-gray-500 py-4">Tidak ada data untuk ditampilkan.</p>');
-                        countElement.text(`(0 dari ${response.total_rows} baris)`);
-                    }
-                },
-                error: function(xhr) {
-                    const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Gagal memuat data.';
-                    tableContainer.html(`<p class="text-center text-red-500 py-4">Error: ${errorMsg}</p>`);
-                    countElement.text(`(Gagal memuat)`);
-                }
-            });
+            // This function seems specific to another part of the application (preview_modal.html perhaps)
+            // and might not be directly used by the dataDistributionModal in this exact form.
+            // The dataDistributionModal now has its own integrated preview logic.
         }
 
     </script>
@@ -1332,60 +1034,62 @@
     <!-- Data Distribution Modal -->
     <div id="dataDistributionModal" class="modal">
         <div class="modal-content max-w-2xl" style="overflow: auto; max-height: 90vh;"> <!-- Added overflow and max-height -->
-            <h2 class="text-xl font-bold mb-4">Distribusi Data Latih & Uji</h2>
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="dataDistributionModalTitle" class="text-xl font-bold">Distribusi Data Latih & Uji</h2>
+                <button onclick="closeModal('dataDistributionModal')" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
 
-            <div id="dataDistributionInitialView"> <!-- Wrapper for initial controls -->
-                <div class="mb-4">
-                    <label for="dataDistSplitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih (untuk Preview)</label>
-                    <div class="flex items-center gap-4">
-                        <input type="range" id="dataDistSplitSlider" name="dataDistSplitSlider" min="50" max="95" value="80" step="1" class="w-full">
-                        <span id="dataDistSplitValueLabel" class="font-semibold text-blue-700">80%</span>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Geser slider untuk menentukan persentase, lalu klik "Preview Distribusi".</p>
-                </div>
+            <!-- Dataset selection (assuming you might want to select which dataset to preview) -->
+            <div class="mb-4">
+                <label for="datasetSelect" class="block text-sm font-medium text-gray-700 mb-1">Pilih Dataset:</label>
+                <select id="datasetSelect" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="labeled_data.csv">labeled_data.csv</option>
+                    <!-- Add other available datasets here, e.g., temp_upload.csv if applicable -->
+                    <option value="temp_upload.csv">temp_upload.csv (Data Baru Diunggah)</option>
+                </select>
+            </div>
 
-                <div class="mb-6 text-center">
-                    <button type="button" id="previewDataDistributionButton" class="btn btn-primary">
-                        <i class="fas fa-eye mr-1"></i> Preview Distribusi
-                    </button>
+            <div class="mb-6">
+                <label for="dataSplitSlider" class="block text-sm font-medium text-gray-700">Persentase Data Latih: <span id="sliderValue" class="font-bold">80%</span></label>
+                <input type="range" id="dataSplitSlider" min="0" max="100" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0%</span>
+                    <span>100%</span>
                 </div>
             </div>
 
-            <div id="dataDistributionResultsView" class="hidden"> <!-- Wrapper for results, initially hidden -->
-                <div class="mb-6">
-                    <h3 class="text-md font-medium text-gray-800 mb-2">Distribusi Data Aktual Tersimpan</h3>
-                    <div id="dataSplitChartContainer" class="hidden"> 
-                        <div id="dataSplitChart" style="width:100%; height:350px;"></div>
-                    </div>
-                    <p id="dataSplitChartPlaceholder" class="text-center text-gray-500 py-4">Klik "Preview Distribusi" untuk melihat chart.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
+                <div class="bg-blue-50 p-3 rounded-md">
+                    <p class="font-semibold text-blue-700">Data Latih</p>
+                    <p><span id="trainPercentage">80.00</span>% (<span id="trainRowCount">0</span> baris)</p>
                 </div>
-
-                <hr class="my-6">
-
-                <div class="mt-4 mb-6">
-                    <h3 class="text-md font-medium text-gray-800 mb-2">Tabel Detail Pembagian Data (Sesuai Slider Preview)</h3>
-                    <div id="dataSplitDetailTableContainer" class="hidden"> 
-                        <div class="custom-table-container">
-                            <table class="custom-table" id="dataSplitDetailTable">
-                                <thead>
-                                    <tr>
-                                        <th class="py-2 px-3">Jenis Data</th>
-                                        <th class="py-2 px-3 text-center">Persentase</th> <!-- Centered -->
-                                        <th class="py-2 px-3 text-center">Jumlah Data</th> <!-- Centered -->
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Rows will be populated by JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <p id="dataSplitTablePlaceholder" class="text-center text-gray-500 py-4">Klik "Preview Distribusi" untuk melihat detail tabel.</p>
+                <div class="bg-green-50 p-3 rounded-md">
+                    <p class="font-semibold text-green-700">Data Uji</p>
+                    <p><span id="testPercentage">20.00</span>% (<span id="testRowCount">0</span> baris)</p>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Tabel Pembagian Data</h3>
+                <div id="dataDistributionTableContainer" class="custom-table-container border rounded-md">
+                    <!-- Table will be populated by JavaScript -->
+                    <p class="text-center p-4">Sesuaikan persentase dan pilih dataset untuk melihat preview.</p>
                 </div>
             </div>
 
-            <div class="flex justify-end mt-4">
-                <button type="button" class="btn bg-gray-200" onclick="closeModal('dataDistributionModal')">Tutup</button>
+            <div>
+                <h3 class="text-lg font-semibold mb-2">Grafik Pembagian Data</h3>
+                <div id="dataDistributionChartContainer" class="border rounded-md p-4 min-h-[300px] flex items-center justify-center">
+                    <!-- Chart will be populated by JavaScript -->
+                    <p class="text-center">Grafik akan muncul di sini setelah data dimuat.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3">
+                <button onclick="closeModal('dataDistributionModal')" class="btn bg-gray-200 hover:bg-gray-300 text-gray-700">Tutup</button>
+                <button id="applyDataSplitButton" class="btn btn-primary">Terapkan & Latih Model</button> <!-- This button's action needs to be defined -->
             </div>
         </div>
     </div>
