@@ -551,9 +551,9 @@
     <!-- Analyze Modal -->
     <div id="analyzeModal" class="modal">
         <div class="modal-content">
-            <h2 class="text-xl font-bold mb-4">Analisis Sentimen Text</h2>
-            <form id="analysisForm">
+            <h2 class="text-xl font-bold mb-4">Analisis Sentimen Text</h2>            <form id="analysisForm">
                 <textarea 
+                    id="analysisText"
                     class="w-full p-2 border rounded-lg mb-4" 
                     name="comment" 
                     rows="4" 
@@ -883,17 +883,21 @@
             $('#' + section + '-section').show();
             $('.nav-item').removeClass('active');
             $('a[onclick="showSection(\'' + section + '\')]').addClass('active');
-        }
-
-        // Analysis form submission
+        }        // Analysis form submission
         $('#analysisForm').on('submit', function(e) {
             e.preventDefault();
             const text = $('#analysisText').val();
+            
+            if (!text.trim()) {
+                $('#analysisResult').html('<p class="text-red-500">Mohon masukkan teks untuk dianalisis.</p>').removeClass('hidden');
+                return;
+            }
+            
             $.ajax({
                 url: '/api/analyze',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({ text: text }),
+                data: JSON.stringify({ comment: text }),
                 success: function(response) {
                     let sentimentClass = '';
                     if (response.sentiment === 'positive') sentimentClass = 'positive';
@@ -906,8 +910,12 @@
                         <p><strong>Confidence:</strong> ${(response.confidence * 100).toFixed(2)}%</p>
                     `).removeClass('hidden');
                 },
-                error: function() {
-                    $('#analysisResult').html('<p class="text-red-500">Error analyzing text.</p>').removeClass('hidden');
+                error: function(xhr) {
+                    let errorMessage = 'Error analyzing text.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    $('#analysisResult').html(`<p class="text-red-500">${errorMessage}</p>`).removeClass('hidden');
                 }
             });
         });

@@ -504,10 +504,18 @@ def analyze_text():
         if not session.get('logged_in'):
             return jsonify({'error': 'Unauthorized access'}), 401
 
-        data = request.json
-        text = data['comment']
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        text = data.get('comment', '').strip()
+        if not text:
+            return jsonify({'error': 'No text provided for analysis'}), 400
+            
         result = analyzer.analyze_text(text)
         return jsonify(result)
+    except KeyError as e:
+        return jsonify({'error': f'Missing required field: {str(e)}'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
