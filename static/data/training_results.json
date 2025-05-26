@@ -3,19 +3,19 @@
   "eval_result": {
     "confusion_matrix": [
       [
-        6,
-        5,
-        16
-      ],
-      [
+        25,
         2,
-        35,
-        19
+        9
       ],
       [
-        7,
-        14,
-        217
+        3,
+        56,
+        21
+      ],
+      [
+        9,
+        11,
+        452
       ]
     ],
     "labels": [
@@ -25,55 +25,55 @@
     ],
     "classification_report": {
       "negative": {
-        "precision": 0.4,
-        "recall": 0.2222222222222222,
-        "f1-score": 0.2857142857142857,
-        "support": 27.0
+        "precision": 0.6756756756756757,
+        "recall": 0.6944444444444444,
+        "f1-score": 0.684931506849315,
+        "support": 36.0
       },
       "neutral": {
-        "precision": 0.6481481481481481,
-        "recall": 0.625,
-        "f1-score": 0.6363636363636364,
-        "support": 56.0
+        "precision": 0.8115942028985508,
+        "recall": 0.7,
+        "f1-score": 0.7516778523489933,
+        "support": 80.0
       },
       "positive": {
-        "precision": 0.8611111111111112,
-        "recall": 0.9117647058823529,
-        "f1-score": 0.8857142857142858,
-        "support": 238.0
+        "precision": 0.9377593360995851,
+        "recall": 0.9576271186440678,
+        "f1-score": 0.9475890985324948,
+        "support": 472.0
       },
-      "accuracy": 0.8037383177570093,
+      "accuracy": 0.9064625850340136,
       "macro avg": {
-        "precision": 0.6364197530864198,
-        "recall": 0.5863289760348583,
-        "f1-score": 0.6025974025974027,
-        "support": 321.0
+        "precision": 0.8083430715579372,
+        "recall": 0.7840238543628374,
+        "f1-score": 0.7947328192436011,
+        "support": 588.0
       },
       "weighted avg": {
-        "precision": 0.7851736471674168,
-        "recall": 0.8037383177570093,
-        "f1-score": 0.7917465711858236,
-        "support": 321.0
+        "precision": 0.9045480734612458,
+        "recall": 0.9064625850340136,
+        "f1-score": 0.9048534301731842,
+        "support": 588.0
       }
     }
   },
-  "accuracy": 0.8037383177570093,
+  "accuracy": 0.9064625850340136,
   "training_logs": [
     "Memulai proses pelatihan model...",
     "Parameter diterima: split data 80% latih, 20% uji",
     "Memuat dataset dari database...",
-    "Dataset dimuat: 1602 data",
+    "Dataset dimuat: 2940 data",
     "Mengacak dataset untuk memastikan distribusi yang merata...",
-    "Membagi dataset: 1281 data latih, 321 data uji",
+    "Membagi dataset: 2352 data latih, 588 data uji",
     "Data split berhasil disimpan",
     "Mulai tahap pra-pemrosesan teks...",
     "Menghapus stopwords dari teks...",
-    "Melakukan vektorisasi dengan metode count, max features: 5000...",
-    "Jumlah fitur setelah vektorisasi: 5000",
+    "Melakukan vektorisasi dengan metode count, max features: 2000...",
+    "Jumlah fitur setelah vektorisasi: 2000",
     "Parameter Decision Tree: max_depth=none, criterion=gini, min_samples_split=2, min_samples_leaf=1",
     "Mulai pelatihan model decision tree...",
     "Pelatihan model selesai",
-    "Evaluasi model pada data uji: akurasi = 0.8037 (80.37%)",
+    "Evaluasi model pada data uji: akurasi = 0.9065 (90.65%)",
     "Menyimpan model ke database...",
     "Model berhasil disimpan ke database",
     "Membuat struktur pohon keputusan C5.0...",
@@ -81,6 +81,6 @@
     "Aturan keputusan disimpan dalam format teks",
     "Membuat visualisasi pohon keputusan...",
     "Proses pelatihan selesai!",
-    "Akurasi model: 80.37%"
+    "Akurasi model: 90.65%"
   ]
 }

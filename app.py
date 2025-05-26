@@ -764,11 +764,9 @@ def train_model():
                 return " ".join([lemmatizer.lemmatize(word) for word in text.split()])
 
             df_train['preprocessed_text'] = df_train['preprocessed_text'].apply(lemmatize_text)
-            df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(lemmatize_text)
-
-        # Vectorization based on parameters
+            df_test['preprocessed_text'] = df_test['preprocessed_text'].apply(lemmatize_text)        # Vectorization based on parameters
         vectorization_method = vectorization_params.get('method', 'count')
-        max_features = int(vectorization_params.get('max_features', 5000))
+        max_features = int(vectorization_params.get('max_features', 2000))
 
         training_logs.append(f"Melakukan vektorisasi dengan metode {vectorization_method}, max features: {max_features}...")
         if vectorization_method == 'tfidf':
@@ -840,22 +838,28 @@ def train_model():
             training_logs.append("Koneksi database gagal, menyimpan model ke disk...")
             with open('static/data/sentiment_model.pkl', 'wb') as f:
                 pickle.dump({'model': clf, 'vectorizer': vectorizer}, f)
-            training_logs.append("Model berhasil disimpan ke disk")
-
-        # Save rules as JSON using manual C5.0-like function
+            training_logs.append("Model berhasil disimpan ke disk")        # Save rules as JSON using manual C5.0-like function
         training_logs.append("Membuat struktur pohon keputusan C5.0...")
         sentiment_labels = sorted(y_train.unique())
         label_to_int = {label: i for i, label in enumerate(sentiment_labels)}
         int_to_label = {i: label for label, i in label_to_int.items()}
 
         y_train_int = np.array([label_to_int[y] for y in y_train])
-        X_train_arr = X_train.toarray()
-        feature_names = vectorizer.get_feature_names_out().tolist()
-
-        c50_tree = build_c50_tree(X_train_arr, y_train_int, feature_names)
-        training_logs.append("Struktur pohon keputusan berhasil dibuat")
-
-        # Recursively convert integer classes to sentiment labels in the tree
+        
+        # Check if converting to dense array will cause memory issues
+        # Calculate memory requirement: rows * cols * 8 bytes (int64)
+        memory_required_mb = (X_train.shape[0] * X_train.shape[1] * 8) / (1024 * 1024)
+        
+        if memory_required_mb > 100:  # If more than 100MB required
+            training_logs.append(f"Dataset terlalu besar untuk membuat pohon C5.0 (memerlukan {memory_required_mb:.1f}MB), menggunakan scikit-learn tree sebagai gantinya...")
+            # Use simplified tree rules from scikit-learn
+            c50_tree = {"message": "Tree too large for C5.0 format", "sklearn_tree_used": True}
+        else:
+            X_train_arr = X_train.toarray()
+            feature_names = vectorizer.get_feature_names_out().tolist()
+            c50_tree = build_c50_tree(X_train_arr, y_train_int, feature_names)
+        
+        training_logs.append("Struktur pohon keputusan berhasil dibuat")        # Recursively convert integer classes to sentiment labels in the tree
         def convert_classes(tree):
             if "class" in tree:
                 tree["class"] = int_to_label.get(tree["class"], str(tree["class"]))
@@ -864,12 +868,17 @@ def train_model():
                     convert_classes(v)
             return tree
 
-        c50_tree = convert_classes(c50_tree)
+        # Only convert classes if we have a proper tree structure
+        if "sklearn_tree_used" not in c50_tree:
+            c50_tree = convert_classes(c50_tree)
+        
         with open('static/data/rules.json', 'w') as f:
             json.dump(c50_tree, f, indent=2)        # Save human-readable rules as TXT
         def rules_to_text(tree, indent=0):
             pad = "    " * indent
-            if "class" in tree:
+            if "sklearn_tree_used" in tree:
+                return "Pohon keputusan terlalu besar untuk ditampilkan dalam format C5.0.\nGunakan visualisasi SVG untuk melihat struktur pohon."
+            elif "class" in tree:
                 return pad + f"MAKA Sentimen = {tree['class']}\n"
             elif "feature" in tree and "splits" in tree:
                 lines = []
@@ -882,6 +891,7 @@ def train_model():
                     lines.append(rules_to_text(subtree, indent + 1))
                 return "\n".join(lines)
             return ""
+        
         rules_txt = rules_to_text(c50_tree)
         with open('sentiment_rules.txt', 'w', encoding='utf-8') as f:
             f.write(rules_txt)

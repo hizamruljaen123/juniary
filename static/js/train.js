@@ -64,9 +64,7 @@ $('#trainButton').click(function() {
                     logsHtml += `<li class="text-gray-600">${log}</li>`;
                 });
                 logsHtml += '</ol></div>';
-            }
-
-            $('#trainResult').html(`
+            }            $('#trainResult').html(`
                 <div class="text-green-700 mb-2">Model berhasil dilatih!</div>
                 <div class="text-sm text-gray-600 mb-2">
                     Split: ${splitPercent}% data latih / ${100-splitPercent}% data uji
@@ -77,23 +75,15 @@ $('#trainButton').click(function() {
                 <div class="mt-3 text-right">
                     <button id="expandLogsBtn" class="text-blue-600 hover:text-blue-800 text-sm underline">Lihat Detail Log</button>
                 </div>
-            `);
-
-            // Auto-reload page setelah 5 detik
-            let countdown = 5;
-            const countdownTimer = setInterval(() => {
-                countdown--;
-                $('#reloadCountdown').text(countdown);
-                if (countdown <= 0) {
-                    clearInterval(countdownTimer);
-                    location.reload();
-                }
-            }, 1000);
-
-            // Add event handler for expand logs button
+                <div class="mt-3 p-3 bg-blue-50 text-blue-700 rounded-lg text-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span>Training selesai! Klik "Lihat Detail Log" untuk melihat hasil lengkap, atau tutup modal untuk memperbarui dashboard.</span>
+                    </div>
+                </div>
+            `);            // Add event handler for expand logs button
             $('#expandLogsBtn').click(function(e) {
                 e.preventDefault();
-                clearInterval(countdownTimer); // Cancel auto-reload
 
                 $('#trainingLogsModal').removeClass('hidden').addClass('flex');
 

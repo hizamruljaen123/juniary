@@ -327,14 +327,34 @@
                     </script>
                 </div>
             </div>
-            {% endif %}
-
-            <!-- Confusion Matrix Heatmap -->
+            {% endif %}            <!-- Confusion Matrix Heatmap -->
             {% if eval_result %}
             <div class="dashboard-card mb-8">
                 <div class="p-6">
                     <h5 class="text-lg font-medium text-gray-900 mb-4">Heatmap Confusion Matrix (Evaluasi Data Uji)</h5>
                     <div id="confusionMatrixHeatmap" style="width:100%; height:400px;"></div>
+                    
+                    <!-- Classification Report Table -->
+                    <div class="mt-6">
+                        <h6 class="text-md font-medium text-gray-700 mb-3">Classification Report</h6>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="py-3 px-4 text-sm font-medium text-gray-500 uppercase tracking-wider border-b">Class</th>
+                                        <th class="py-3 px-4 text-sm font-medium text-gray-500 uppercase tracking-wider border-b">Precision</th>
+                                        <th class="py-3 px-4 text-sm font-medium text-gray-500 uppercase tracking-wider border-b">Recall</th>
+                                        <th class="py-3 px-4 text-sm font-medium text-gray-500 uppercase tracking-wider border-b">F1-Score</th>
+                                        <th class="py-3 px-4 text-sm font-medium text-gray-500 uppercase tracking-wider border-b">Support</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboardClassificationReportBody">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
                     <script type="application/json" id="eval-result-data">{{ eval_result|tojson|safe }}</script>
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {
@@ -342,6 +362,8 @@
                             if (evalResultScript) {
                                 try {
                                     const evalResult = JSON.parse(evalResultScript.textContent);
+                                    
+                                    // Render Confusion Matrix
                                     if (evalResult && evalResult.confusion_matrix && evalResult.labels) {
                                         const z = evalResult.confusion_matrix;
                                         const x = evalResult.labels;
@@ -366,8 +388,82 @@
                                         };
                                         Plotly.newPlot('confusionMatrixHeatmap', data, layout);
                                     }
+                                    
+                                    // Render Classification Report Table
+                                    if (evalResult && evalResult.classification_report) {
+                                        const reportBody = document.getElementById('dashboardClassificationReportBody');
+                                        if (reportBody) {
+                                            reportBody.innerHTML = '';
+                                            
+                                            const report = evalResult.classification_report;
+                                            
+                                            // Add rows for each class
+                                            for (const className of evalResult.labels) {
+                                                if (report[className]) {
+                                                    const classData = report[className];
+                                                    const row = document.createElement('tr');
+                                                    row.className = 'hover:bg-gray-50';
+                                                    row.innerHTML = `
+                                                        <td class="py-3 px-4 font-medium text-gray-900">${className}</td>
+                                                        <td class="py-3 px-4 text-gray-700">${(classData.precision * 100).toFixed(2)}%</td>
+                                                        <td class="py-3 px-4 text-gray-700">${(classData.recall * 100).toFixed(2)}%</td>
+                                                        <td class="py-3 px-4 text-gray-700">${(classData['f1-score'] * 100).toFixed(2)}%</td>
+                                                        <td class="py-3 px-4 text-gray-700">${classData.support}</td>
+                                                    `;
+                                                    reportBody.appendChild(row);
+                                                }
+                                            }
+                                            
+                                            // Add separator row
+                                            const separatorRow = document.createElement('tr');
+                                            separatorRow.innerHTML = '<td colspan="5" class="py-1"></td>';
+                                            reportBody.appendChild(separatorRow);
+                                            
+                                            // Add macro avg row
+                                            if (report['macro avg']) {
+                                                const macroRow = document.createElement('tr');
+                                                macroRow.className = 'bg-blue-50 font-medium';
+                                                const macroData = report['macro avg'];
+                                                macroRow.innerHTML = `
+                                                    <td class="py-3 px-4 text-blue-900">Macro Avg</td>
+                                                    <td class="py-3 px-4 text-blue-800">${(macroData.precision * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-blue-800">${(macroData.recall * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-blue-800">${(macroData['f1-score'] * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-blue-800">${macroData.support}</td>
+                                                `;
+                                                reportBody.appendChild(macroRow);
+                                            }
+                                            
+                                            // Add weighted avg row
+                                            if (report['weighted avg']) {
+                                                const weightedRow = document.createElement('tr');
+                                                weightedRow.className = 'bg-green-50 font-medium';
+                                                const weightedData = report['weighted avg'];
+                                                weightedRow.innerHTML = `
+                                                    <td class="py-3 px-4 text-green-900">Weighted Avg</td>
+                                                    <td class="py-3 px-4 text-green-800">${(weightedData.precision * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-green-800">${(weightedData.recall * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-green-800">${(weightedData['f1-score'] * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-green-800">${weightedData.support}</td>
+                                                `;
+                                                reportBody.appendChild(weightedRow);
+                                            }
+                                            
+                                            // Add overall accuracy row
+                                            if (report.accuracy) {
+                                                const accuracyRow = document.createElement('tr');
+                                                accuracyRow.className = 'bg-yellow-50 font-medium';
+                                                accuracyRow.innerHTML = `
+                                                    <td class="py-3 px-4 text-yellow-900">Overall Accuracy</td>
+                                                    <td class="py-3 px-4 text-yellow-800" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
+                                                    <td class="py-3 px-4 text-yellow-800">${report['weighted avg'] ? report['weighted avg'].support : '-'}</td>
+                                                `;
+                                                reportBody.appendChild(accuracyRow);
+                                            }
+                                        }
+                                    }
                                 } catch (e) {
-                                    // ignore
+                                    console.error('Error parsing eval result data:', e);
                                 }
                             }
                         });
@@ -649,11 +745,10 @@
                                 <option value="count">Count Vectorizer</option>
                                 <option value="tfidf">TF-IDF Vectorizer</option>
                             </select>
-                        </div>
-                        <div class="mt-2">
+                        </div>                        <div class="mt-2">
                             <label class="block text-sm text-gray-700 mb-1">Max Features</label>
-                            <input type="number" id="maxFeatures" min="100" max="10000" value="5000" class="w-full p-2 border rounded">
-                            <p class="text-xs text-gray-500 mt-1">Jumlah maksimal fitur yang digunakan</p>
+                            <input type="number" id="maxFeatures" min="100" max="10000" value="2000" class="w-full p-2 border rounded">
+                            <p class="text-xs text-gray-500 mt-1">Jumlah maksimal fitur yang digunakan (default: 2000 untuk menghemat memori)</p>
                         </div>
                     </div>
 
@@ -773,10 +868,13 @@
                     loadDataDistribution();
                 }
             }
-        }
-
-        function closeModal(modalId) {
+        }        function closeModal(modalId) {
             $('#' + modalId).removeClass('flex items-center justify-center').addClass('hidden');
+            
+            // If closing training modal and training was successful, reload page to show updated results
+            if (modalId === 'trainingModal' && !$('#trainResult').hasClass('hidden')) {
+                location.reload();
+            }
         }
 
         // Navigation
