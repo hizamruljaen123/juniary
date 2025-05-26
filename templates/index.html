@@ -584,111 +584,120 @@
                 </div>
             </form>
         </div>
-    </div><!-- Training Modal -->
+    </div>    <!-- Training Modal -->
     <div id="trainingModal" class="modal">
-        <div class="modal-content">
-            <h2 class="text-xl font-bold mb-4">Training Model</h2>
-            <div class="mb-4">
-                <p class="text-gray-600">Mulai pelatihan model dengan dataset yang tersedia</p>
-            </div>
-
-            <!-- Data Split Section -->
-            <div class="mb-4">
-                <h3 class="text-md font-medium text-gray-800 mb-2">Pembagian Data</h3>
-                <label for="splitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih</label>
-                <div class="flex items-center gap-4">
-                    <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'; updateSplitPreviewChart(this.value);">
-                    <span id="splitValueLabel" class="font-semibold text-blue-700">80%</span>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Pilih persentase data latih (sisanya untuk data uji)</p>
-                <!-- Div untuk preview chart -->
-                <div id="splitPreviewChart" style="width:100%; height:300px; margin-top: 1rem;"></div>
-            </div>
-
-            <!-- Advanced Parameters -->
-            <div class="mb-4">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-md font-medium text-gray-800">Parameter Lanjutan</h3>
-                    <button id="toggleAdvanced" type="button" class="text-sm text-blue-600 hover:text-blue-800">
-                        <span id="toggleText">Tampilkan</span> <i class="fas fa-chevron-down" id="toggleIcon"></i>
-                    </button>
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+            <!-- Header yang sticky -->
+            <div class="sticky top-0 bg-white z-10 pb-4 border-b border-gray-200 mb-4">
+                <h2 class="text-xl font-bold">Training Model</h2>
+                <div class="mt-2">
+                    <p class="text-gray-600">Mulai pelatihan model dengan dataset yang tersedia</p>
                 </div>
             </div>
 
-            <div id="advancedParams" class="hidden">
-                <!-- Tokenization Section -->
-                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 class="text-sm font-medium text-gray-800 mb-2">Tokenization</h4>
-                    <div class="flex flex-col space-y-3">
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="removeStopwords" name="removeStopwords" class="form-checkbox" checked>
-                            <span class="ml-2 text-sm text-gray-700">Hapus Stopwords</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="stemming" name="stemming" class="form-checkbox">
-                            <span class="ml-2 text-sm text-gray-700">Gunakan Stemming</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="lemmatization" name="lemmatization" class="form-checkbox">
-                            <span class="ml-2 text-sm text-gray-700">Gunakan Lemmatization</span>
-                        </label>
+            <!-- Konten yang dapat di-scroll -->
+            <div class="space-y-4">
+                <!-- Data Split Section -->
+                <div class="mb-4">
+                    <h3 class="text-md font-medium text-gray-800 mb-2">Pembagian Data</h3>
+                    <label for="splitSlider" class="block text-sm font-medium text-gray-700 mb-2">Persentase Data Latih</label>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="splitSlider" name="splitSlider" min="50" max="95" value="80" step="1" class="w-full" oninput="splitValueLabel.textContent = this.value + '%'; updateSplitPreviewChart(this.value);">
+                        <span id="splitValueLabel" class="font-semibold text-blue-700">80%</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Pilih persentase data latih (sisanya untuk data uji)</p>
+                    <!-- Div untuk preview chart -->
+                    <div id="splitPreviewChart" style="width:100%; height:300px; margin-top: 1rem;"></div>
+                </div>
+
+                <!-- Advanced Parameters -->
+                <div class="mb-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-md font-medium text-gray-800">Parameter Lanjutan</h3>
+                        <button id="toggleAdvanced" type="button" class="text-sm text-blue-600 hover:text-blue-800">
+                            <span id="toggleText">Tampilkan</span> <i class="fas fa-chevron-down" id="toggleIcon"></i>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Vectorization Section -->
-                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 class="text-sm font-medium text-gray-800 mb-2">Vectorization</h4>
-                    <div>
-                        <label class="block text-sm text-gray-700 mb-1">Metode Vectorization</label>
-                        <select id="vectorizationMethod" class="w-full p-2 border rounded">
-                            <option value="count">Count Vectorizer</option>
-                            <option value="tfidf">TF-IDF Vectorizer</option>
-                        </select>
+                <div id="advancedParams" class="hidden">
+                    <!-- Tokenization Section -->
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-800 mb-2">Tokenization</h4>
+                        <div class="flex flex-col space-y-3">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="removeStopwords" name="removeStopwords" class="form-checkbox" checked>
+                                <span class="ml-2 text-sm text-gray-700">Hapus Stopwords</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="stemming" name="stemming" class="form-checkbox">
+                                <span class="ml-2 text-sm text-gray-700">Gunakan Stemming</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="lemmatization" name="lemmatization" class="form-checkbox">
+                                <span class="ml-2 text-sm text-gray-700">Gunakan Lemmatization</span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="mt-2">
-                        <label class="block text-sm text-gray-700 mb-1">Max Features</label>
-                        <input type="number" id="maxFeatures" min="100" max="10000" value="5000" class="w-full p-2 border rounded">
-                        <p class="text-xs text-gray-500 mt-1">Jumlah maksimal fitur yang digunakan</p>
-                    </div>
-                </div>
 
-                <!-- C5.0/Decision Tree Section -->
-                <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 class="text-sm font-medium text-gray-800 mb-2">Parameter Decision Tree</h4>
-                    <div class="mb-2">
-                        <label class="block text-sm text-gray-700 mb-1">Max Depth</label>
-                        <select id="maxDepth" class="w-full p-2 border rounded">
-                            <option value="none">Unlimited</option>
-                            <option value="3">3</option>
-                            <option value="5">5</option>
-                            <option value="7">7</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
+                    <!-- Vectorization Section -->
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-800 mb-2">Vectorization</h4>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Metode Vectorization</label>
+                            <select id="vectorizationMethod" class="w-full p-2 border rounded">
+                                <option value="count">Count Vectorizer</option>
+                                <option value="tfidf">TF-IDF Vectorizer</option>
+                            </select>
+                        </div>
+                        <div class="mt-2">
+                            <label class="block text-sm text-gray-700 mb-1">Max Features</label>
+                            <input type="number" id="maxFeatures" min="100" max="10000" value="5000" class="w-full p-2 border rounded">
+                            <p class="text-xs text-gray-500 mt-1">Jumlah maksimal fitur yang digunakan</p>
+                        </div>
                     </div>
-                    <div class="mb-2">
-                        <label class="block text-sm text-gray-700 mb-1">Min Samples Split</label>
-                        <input type="number" id="minSamplesSplit" min="2" max="50" value="2" class="w-full p-2 border rounded">
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm text-gray-700 mb-1">Min Samples Leaf</label>
-                        <input type="number" id="minSamplesLeaf" min="1" max="50" value="1" class="w-full p-2 border rounded">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-700 mb-1">Criterion</label>
-                        <select id="criterion" class="w-full p-2 border rounded">
-                            <option value="gini">Gini</option>
-                            <option value="entropy">Entropy</option>
-                        </select>
+
+                    <!-- C5.0/Decision Tree Section -->
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-800 mb-2">Parameter Decision Tree</h4>
+                        <div class="mb-2">
+                            <label class="block text-sm text-gray-700 mb-1">Max Depth</label>
+                            <select id="maxDepth" class="w-full p-2 border rounded">
+                                <option value="none">Unlimited</option>
+                                <option value="3">3</option>
+                                <option value="5">5</option>
+                                <option value="7">7</option>
+                                <option value="10">10</option>
+                                <option value="15">15</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm text-gray-700 mb-1">Min Samples Split</label>
+                            <input type="number" id="minSamplesSplit" min="2" max="50" value="2" class="w-full p-2 border rounded">
+                        </div>
+                        <div class="mb-2">
+                            <label class="block text-sm text-gray-700 mb-1">Min Samples Leaf</label>
+                            <input type="number" id="minSamplesLeaf" min="1" max="50" value="1" class="w-full p-2 border rounded">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">Criterion</label>
+                            <select id="criterion" class="w-full p-2 border rounded">
+                                <option value="gini">Gini</option>
+                                <option value="entropy">Entropy</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2">
-                <button type="button" class="btn bg-gray-200" onclick="closeModal('trainingModal')">Tutup</button>
-                <button id="trainButton" class="btn btn-primary">Mulai Training</button>
+            <!-- Footer yang sticky -->
+            <div class="sticky bottom-0 bg-white z-10 pt-4 border-t border-gray-200 mt-4">
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn bg-gray-200" onclick="closeModal('trainingModal')">Tutup</button>
+                    <button id="trainButton" class="btn btn-primary">Mulai Training</button>
+                </div>
+                <div id="trainResult" class="hidden mt-4 p-4 bg-green-50 text-green-700 rounded-lg"></div>
             </div>
-            <div id="trainResult" class="hidden mt-4 p-4 bg-green-50 text-green-700 rounded-lg"></div>
         </div>
     </div>
 
@@ -1129,10 +1138,10 @@
                             reportBody.append(`
                                 <tr>
                                     <td class="py-2 px-3">${className}</td>
-                                    <td class="py-2 px-3">${(classData.precision * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3">${(classData.recall * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3">${(classData['f1-score'] * 100).toFixed(2)}%</td>
-                                    <td class="py-2 px-3">${classData.support}</td>
+                                    <td class="py-2 px-3 text-center">${(classData.precision * 100).toFixed(2)}%</td>
+                                    <td class="py-2 px-3 text-center">${(classData.recall * 100).toFixed(2)}%</td>
+                                    <td class="py-2 px-3 text-center">${(classData['f1-score'] * 100).toFixed(2)}%</td>
+                                    <td class="py-2 px-3 text-center">${classData.support}</td>
                                 </tr>
                             `);
                         }
@@ -1142,8 +1151,8 @@
                     reportBody.append(`
                         <tr class="bg-gray-50 font-medium">
                             <td class="py-2 px-3">Accuracy</td>
-                            <td class="py-2 px-3" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
-                            <td class="py-2 px-3">${report['weighted avg'].support}</td>
+                            <td class="py-2 px-3 text-center" colspan="3">${(report.accuracy * 100).toFixed(2)}%</td>
+                            <td class="py-2 px-3 text-center">${report['weighted avg'].support}</td>
                         </tr>
                     `);
                 }
