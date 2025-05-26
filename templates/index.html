@@ -860,12 +860,46 @@
                     <td class="py-2 px-3 text-center">${trainPercent.toFixed(1)}%</td>
                     <td class="py-2 px-3 text-center">${trainCount}</td>
                 </tr>
-                <tr>
-                    <td class="py-2 px-3">Data Uji (sesuai slider)</td>
+                <tr>                    <td class="py-2 px-3">Data Uji (sesuai slider)</td>
                     <td class="py-2 px-3 text-center">${testPercent.toFixed(1)}%</td>
                     <td class="py-2 px-3 text-center">${testCount}</td>
                 </tr>
             `);
+        }
+
+        // Function to update chart based on slider value
+        function updateDataDistributionChart(sliderValue, totalData) {
+            if (totalData <= 0) return;
+            
+            const trainPercent = parseFloat(sliderValue);
+            const testPercent = 100 - trainPercent;
+            const trainCount = Math.round(totalData * (trainPercent / 100));
+            const testCount = totalData - trainCount;
+            
+            const pieData = [{
+                labels: [`Data Latih (${trainPercent.toFixed(1)}%)`, `Data Uji (${testPercent.toFixed(1)}%)`],
+                values: [trainCount, testCount],
+                type: 'pie',
+                marker: { colors: ['#3b82f6', '#10b981'] },
+                textinfo: 'label+percent+value',
+                hole: 0.4,
+                textposition: 'inside',
+                insidetextfont: { color: 'white', size: 14 }
+            }];
+            const pieLayout = {
+                title: 'Distribusi Data Berdasarkan Slider',
+                showlegend: true,
+                height: 350,
+                margin: { t: 50, b: 20, l: 20, r: 20 },
+                annotations: [{
+                    text: 'Total: ' + totalData,
+                    showarrow: false,
+                    font: { size: 16 },
+                    x: 0.5, y: 0.5,
+                    xanchor: 'center', yanchor: 'middle'
+                }]
+            };
+            Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
         }
 
 
@@ -894,10 +928,8 @@
                     $('#dataSplitChartPlaceholder').addClass('hidden');
                     $('#dataSplitChartContainer').removeClass('hidden');
                     $('#dataSplitTablePlaceholder').addClass('hidden');
-                    $('#dataSplitDetailTableContainer').removeClass('hidden');
-
-                    const pieData = [{
-                        labels: ['Data Latih Aktual', 'Data Uji Aktual'],
+                    $('#dataSplitDetailTableContainer').removeClass('hidden');                    const pieData = [{
+                        labels: ['Data Latih Berdasarkan Slider', 'Data Uji Berdasarkan Slider'],
                         values: [actualTrainSize, actualTestSize],
                         type: 'pie',
                         marker: { colors: ['#3b82f6', '#10b981'] },
@@ -907,7 +939,7 @@
                         insidetextfont: { color: 'white', size: 14 }
                     }];
                     const pieLayout = {
-                        title: 'Distribusi Data Aktual Tersimpan',
+                        title: 'Distribusi Data Berdasarkan Slider',
                         showlegend: true,
                         height: 350,
                         margin: { t: 50, b: 20, l: 20, r: 20 },
@@ -918,23 +950,19 @@
                             x: 0.5, y: 0.5,
                             xanchor: 'center', yanchor: 'middle'
                         }] : [])
-                    };
-                    Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
-
-                    const slider = document.getElementById('dataDistSplitSlider');
-                    const label = document.getElementById('dataDistSplitValueLabel');
-
-                    if (currentDataDistributionTotal > 0) {
+                    };                    if (currentDataDistributionTotal > 0) {
                         const actualTrainPercent = Math.round((actualTrainSize / currentDataDistributionTotal) * 100);
                         slider.value = actualTrainPercent;
                         if (label) label.textContent = actualTrainPercent + '%';
+                        
+                        // Update chart with slider values instead of actual values
+                        updateDataDistributionChart(slider.value, currentDataDistributionTotal);
                         populateDataSplitDetailTable(slider.value, currentDataDistributionTotal);
                     } else {
-                        if (label) label.textContent = slider.value + '%'; // Keep slider value as is or default
-                        populateDataSplitDetailTable(slider.value, 0); // Show table with 0 total
+                        if (label) label.textContent = slider.value + '%';
+                        populateDataSplitDetailTable(slider.value, 0);
                         $('#dataSplitChartPlaceholder').removeClass('hidden').text('Tidak ada data aktual untuk ditampilkan pada chart.');
                         $('#dataSplitChartContainer').addClass('hidden');
-                        // Table placeholder will be handled by populateDataSplitDetailTable if total is 0
                     }
                 },
                 error: function() {
@@ -963,6 +991,39 @@
                     }
                 }
             });
+        }        // Function to update chart based on slider value
+        function updateDataDistributionChart(sliderValue, totalData) {
+            if (totalData <= 0) return;
+            
+            const trainPercent = parseFloat(sliderValue);
+            const testPercent = 100 - trainPercent;
+            const trainCount = Math.round(totalData * (trainPercent / 100));
+            const testCount = totalData - trainCount;
+            
+            const pieData = [{
+                labels: [`Data Latih (${trainPercent.toFixed(1)}%)`, `Data Uji (${testPercent.toFixed(1)}%)`],
+                values: [trainCount, testCount],
+                type: 'pie',
+                marker: { colors: ['#3b82f6', '#10b981'] },
+                textinfo: 'label+percent+value',
+                hole: 0.4,
+                textposition: 'inside',
+                insidetextfont: { color: 'white', size: 14 }
+            }];
+            const pieLayout = {
+                title: 'Distribusi Data Berdasarkan Slider',
+                showlegend: true,
+                height: 350,
+                margin: { t: 50, b: 20, l: 20, r: 20 },
+                annotations: [{
+                    text: 'Total: ' + totalData,
+                    showarrow: false,
+                    font: { size: 16 },
+                    x: 0.5, y: 0.5,
+                    xanchor: 'center', yanchor: 'middle'
+                }]
+            };
+            Plotly.newPlot('dataSplitChart', pieData, pieLayout, {responsive: true});
         }
 
         // Add event listener for the data distribution slider
@@ -977,6 +1038,7 @@
                     // Only update table if results view is visible (meaning data has been loaded once)
                     if (!$('#dataDistributionResultsView').hasClass('hidden')) {
                         populateDataSplitDetailTable(this.value, currentDataDistributionTotal);
+                        updateDataDistributionChart(this.value, currentDataDistributionTotal);
                     }
                 });
             }
